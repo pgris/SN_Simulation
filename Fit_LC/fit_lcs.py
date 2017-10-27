@@ -10,7 +10,7 @@ list_lc=pkl.load(open(thefile,'rb'))
 
 telescope=Telescope(atmos=True,airmass=1.2)
 
-n_multi=2
+n_multi=10
 n_batch=len(list_lc)/n_multi
 
 time_begin=time.time()
@@ -40,6 +40,6 @@ for i in range(n_batch):
     break
 
 for fitval in fit_list:
-    print fitval['salt2.X1'],fitval['salt2.Color']
-
+    print fitval['salt2.X1'][0],fitval.meta['X1'][0],fitval['salt2.Color'][0],fitval.meta['Color'][0],fitval['salt2.T0'][0],fitval.meta['DayMax'][0]
+    
 print 'total elapse time',time.time()-time_begin

@@ -41,7 +41,7 @@ class Fit_Single_LC:
             lc_sel=lc_sel[idxa]
             if len(lc_sel)>0.:
                 self.Get_Quality_LC(lc_sel,lc.meta['DayMax'][0],lc.meta['z'][0])
-                print self.dict_quality
+                #print self.dict_quality
                 #self.Plot_LC(lc_sel)
         
         #print [val for key,val in self.dict_quality.items()]
@@ -51,6 +51,8 @@ class Fit_Single_LC:
                     self.outdict['status']='go_fit'
                     self.outdict['fit_status']='unknow'
                     self.Fit_LC(lc_sel)
+                    print self.outdict.keys()
+                    self.Get_Quality_LC(lc_sel,self.outdict['sncosmo_fitted']['t0'],lc.meta['z'][0])
                 else:
                     self.outdict['status']='no_obs'
                     self.outdict['fit_status']='unknow'
@@ -69,8 +71,6 @@ class Fit_Single_LC:
         """
 
         output_q.put({inum : self.Summary()})
-
-
 
     def Get_Quality_LC(self,lc, T0, z):
 
@@ -236,7 +236,7 @@ class Fit_Single_LC:
         print 'hhhh',len(resu),self.outdict['observations']
         """
         #print 'test here'
-        t=Table()
+        t=Table(meta=self.lc.meta)
         for key,val in resu.items():
             aa = Column([val], name=key)
             t.add_column(aa)
