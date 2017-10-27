@@ -1,0 +1,4 @@
+import cPickle as pkl
+
+
+thefile='Prod_LC/DD_Obs/290/Season_0/DD_290_0.26_0.3_X1_0.0_C_0.0_0.pkl'

@@ -1,0 +1,83 @@
+from Fit_LC import *
+import cPickle as pkl
+
+class Fit_Single_LC:
+    def __init__(self, lc):
+        self.lc=lc
+        self.Get_Quality_LC()
+
+
+     def Get_Quality_LC(self):
+
+        #estimate the number of LC points (5 sigma) before and after T0 - observer frame
+        for band in self.bands_rest:
+            self.dict_quality[band]=(0,0)
+            self.dict_quality['cadence_'+band]=(0.0,0.0)
+            self.dict_quality['m5sigma_'+band]=(0.0,0.0)
+            self.dict_quality['SNR_'+band]=0.0
+        self.dict_quality['all']=(0,0)
+        self.dict_quality['phase']=(0.0,0.0)
+        self.dict_quality['cadence_all']=(0.0,0.0)
+        self.dict_quality['SNR_tot']=0.0
+
+        #print 'Quality',self.lc
+        if self.lc is not None:
+            obs_sel=self.lc[np.where(np.logical_and(self.lc['flux']/self.lc['fluxerr']>5.,self.lc['flux']>0.))]
+            #print 'obs SNR > 5.',len(obs_sel)
+        #print self.Get_nums(obs_sel)
+            if len(obs_sel) > 0:
+                obs_sel.sort('time')
+                n_bef_tot=0
+                n_aft_tot=0
+                self.dict_quality['SNR_tot']=5.*np.power(np.sum(np.power(obs_sel['flux_e_sec']/obs_sel['flux_5sigma_e_sec'],2.)),0.5)
+                #print obs_sel
+                for band in self.bands_rest:
+                    idx=obs_sel['band']=='LSST::'+band
+                    n_bef, n_aft=self.Get_nums(obs_sel[idx])
+                    n_bef_tot+=n_bef
+                    n_aft_tot+=n_aft                    
+                    self.dict_quality[band]=(n_bef,n_aft)
+                   
+                    if len(obs_sel[idx])>=1:
+                        self.dict_quality['SNR_'+band]=5.*np.power(np.sum(np.power(obs_sel['flux_e_sec'][idx]/obs_sel['flux_5sigma_e_sec'][idx],2.)),0.5)
+                        mean_cadence, rms_cadence=self.Get_cadence(obs_sel[idx])
+                        self.dict_quality['cadence_'+band]=(mean_cadence,rms_cadence)
+                        self.dict_quality['m5sigma_'+band]=(np.mean(obs_sel[idx]['m5']),np.std(obs_sel[idx]['m5']))
+
+                    else:
+                        self.dict_quality['SNR_'+band]=0.
+                    #print 'hello SNR',5.*np.power(np.sum(np.power(obs_sel['flux_e_sec'][idx]/obs_sel['flux_5sigma_e_sec'][idx],2.)),0.5)
+
+                self.dict_quality['all']=(n_bef_tot,n_aft_tot) 
+                mean_cadence, rms_cadence=self.Get_cadence(obs_sel)
+                self.dict_quality['cadence_all']=(mean_cadence,rms_cadence)
+
+                obs_sel.sort('time')
+                phase_first=(obs_sel[0]['time']-self.T0)/(1.+self.z)
+                phase_last=(obs_sel[len(obs_sel)-1]['time']-self.T0)/(1.+self.z)
+                self.dict_quality['phase']=(phase_first,phase_last)
+           
+                #print 'this is it',self.dict_quality['g'],self.dict_quality['r'],self.dict_quality['i'],self.dict_quality['z'],self.dict_quality['y']
+        #print phase_first,phase_last
+
+    def Get_nums(self, sel):
+        
+        
+        idxa=np.logical_and(sel['time'] <= self.T0,sel['time'] > self.T0-20)
+        idxb=np.logical_and(sel['time']> self.T0,sel['time'] <= self.T0+40)
+
+        return len(sel[idxa]),len(sel[idxb])
+
+    def Get_cadence(self, sel):
+
+        if len(sel) == 0:
+            return 0.0,0.0
+        else:
+            if len(sel)==1:
+                return 0.0,0.0
+            else:
+                calc=[io-jo for jo,io in zip(sel['time'][:-1], sel['time'][1:])]  
+                if len(calc)==1:
+                    return calc[0],0.0
+                else:
+                    return np.mean(calc),np.std(calc)

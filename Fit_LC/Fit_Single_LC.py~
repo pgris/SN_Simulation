@@ -1,0 +1,6 @@
+from Fit_LC import *
+import cPickle as pkl
+
+class Fit_Single_LC:
+    def __init__(self, lc):
+        self.lc=lc
