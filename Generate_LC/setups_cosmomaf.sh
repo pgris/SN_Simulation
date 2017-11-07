@@ -37,4 +37,4 @@ setup -k -r ${dir_tag}/sims_catalogs
 setup -k -r ${dir_tag}/sims_maf
 #setup -k -r ../sims_operations
 export FAKE_THROUGH=snfit_data/Instruments/LSST.fake
-export OPSIM_LOGS=../../Ana_Cadence/OpSimLogs
+export OPSIM_LOGS=/sps/lsst/data/dev/pgris/Ana_Cadence/OpSimLogs

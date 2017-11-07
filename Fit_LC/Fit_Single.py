@@ -8,7 +8,7 @@ class Fit_Single_LC:
         
         self.lc=lc
         self.telescope=telescope
-        print lc.dtype
+        #print lc.dtype
         self.bands_rest = 'grizy'
         self.dict_quality={}
         self.outdict={}
@@ -51,7 +51,7 @@ class Fit_Single_LC:
                     self.outdict['status']='go_fit'
                     self.outdict['fit_status']='unknow'
                     self.Fit_LC(lc_sel)
-                    print self.outdict.keys()
+                    #print self.outdict.keys()
                     self.Get_Quality_LC(lc_sel,self.outdict['sncosmo_fitted']['t0'],lc.meta['z'][0])
                 else:
                     self.outdict['status']='no_obs'
@@ -78,6 +78,7 @@ class Fit_Single_LC:
        
         
         lc.sort('time')
+        #print lc.dtype
         n_bef_tot=0
         n_aft_tot=0
         self.dict_quality['SNR_tot']=5.*np.power(np.sum(np.power(lc['flux_e_sec']/lc['flux_5sigma_e_sec'],2.)),0.5)
@@ -236,10 +237,18 @@ class Fit_Single_LC:
         print 'hhhh',len(resu),self.outdict['observations']
         """
         #print 'test here'
-        t=Table(meta=self.lc.meta)
+        #t=Table(meta=self.lc.meta)
+        t=Table()
+        """
+        print self.lc.meta.keys()
+        pol=self.lc.meta['DayMax'].quantity
+        print 'hhh',pol
+        """
+        for key in self.lc.meta.keys():
+            #print key,self.lc.meta[key].quantity
+            t.add_column(Column(self.lc.meta[key].quantity, name=key))
         for key,val in resu.items():
-            aa = Column([val], name=key)
-            t.add_column(aa)
+            t.add_column(Column([val], name=key))
 
         #print t
         return t

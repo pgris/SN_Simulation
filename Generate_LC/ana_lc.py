@@ -10,7 +10,7 @@ fieldid=290
 season=0
 X1=-999.
 Color=-999.
-dirmeas='Prod_LC/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
+dirmeas='../Light_Curves/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
 
 #thefile='Prod_LC/DD_Obs/290/Season_0/DD_290_0.26_0.3_X1_0.0_C_0.0_0.pkl'
 
@@ -39,14 +39,14 @@ for fi in files:
         r.append(tuple(ro))
         #print r,names
     
-
 metadata=np.rec.fromrecords(r,names=names)
 
-
+print 'hello',len(metadata)
 figb, axb = plt.subplots(ncols=2, nrows=2, figsize=(10,9))
 
 axb[0][0].hist(metadata['DayMax'])
-axb[0][1].hist(metadata['X1'])
+axb[0][1].hist(metadata['z'])
+axb[1][0].hist(metadata['X1'])
 axb[1][1].hist(metadata['Color'])
 
 plt.show()

@@ -1,0 +1,15 @@
+import numpy as np
+
+
+parser = OptionParser()
+parser.add_option("-f", "--fieldname", type="string", default='DD', help="filter [%default]")
+parser.add_option("-i", "--fieldid", type="int", default=290, help="filter [%default]")
+parser.add_option("-x", "--stretch", type="float", default=-999., help="filter [%default]")
+parser.add_option("-c", "--color", type="float", default=-999., help="filter [%default]")
+parser.add_option("-d", "--dirmeas", type="string", default="DD", help="filter [%default]")
+parser.add_option("--dirobs", type="string", default="DD", help="filter [%default]")
+
+opts, args = parser.parse_args()
+
+dict_data={}
+

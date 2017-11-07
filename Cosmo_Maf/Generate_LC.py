@@ -1,4 +1,4 @@
-from astropy.table import vstack,Table
+from astropy.table import vstack,Table,Column
 import cPickle as pkl
 from astropy.io import ascii
 import numpy as np
@@ -30,7 +30,7 @@ class Generate_LC:
         #self.table_for_fit = Table(names=('time','flux','fluxerr','band','zp','zpsys'), dtype=('f8', 'f8','f8','S7','f4','S4'))
         #self.table_obs = Table(names=('time','flux','fluxerr','band','zp','zpsys','airmass','m5','expTime','z','T0','x1','c','X0','mbsim','flux_e_sec','flux_5sigma_e_sec'), dtype=('f8', 'f8','f8','S7','f4','S4','f8', 'f8','f8','f8', 'f8','f8','f8','f8','f8','f8','f8'))
         
-        self.table_obs = Table(names=('time','flux','fluxerr','band','zp','zpsys','airmass','m5','expTime','flux_e_sec','flux_5sigma_e_sec'), dtype=('f8', 'f8','f8','S7','f4','S4','f8', 'f8','f8','f8', 'f8'))
+        #self.table_obs = Table(names=('time','flux','fluxerr','band','zp','zpsys','airmass','m5','expTime','flux_e_sec','flux_5sigma_e_sec'), dtype=('f8', 'f8','f8','S7','f4','S4','f8', 'f8','f8','f8', 'f8'))
 
         self.model=model
         self.version=version
@@ -126,6 +126,8 @@ class Generate_LC:
 
     def __call__(self,mjds,airmass,m5,filtre,expTime,out_q):
 
+        #print 'hello here',len(mjds),filtre
+        
         fluxes=10.*self.SN.flux(mjds,self.wave)
         
         wavelength=self.wave/10.
@@ -146,47 +148,104 @@ class Generate_LC:
         itemindex = np.where(mjds==0.)
 
         #print 'hello',itemindex,mjds[itemindex]
+
+
+       
+        #photParams=[]
+        """
+        time_begin=time.time()
         for i in range(len(SED_time.wavelen)):
-                
-            photParams = PhotometricParameters(nexp=expTime[i]/15.)
+            
+
+            photParams=PhotometricParameters(nexp=expTime[i]/15.)
             sed=Sed(wavelen=SED_time.wavelen[i],flambda=SED_time.flambda[i])
             
-            """
-            if filtre == 'r' and i==itemindex[0]:
-                filtercolors = {'u':'b', 'g':'c', 'r':'g', 'i':'y', 'z':'r', 'y':'m'}
-                plt.plot(SED_time.wavelen[i],SED_time.flambda[i],ls='-',label='z ='+str(self.param['z']))
-                plt.ylabel('Flux density [$ergs/cm^2/s/nm$]')
-                plt.xlabel('$\lambda$ [nm]')
-                plt.legend(loc='upper right')
-                plt.title('x0= '+str(self.X0)+' x1= '+str(self.param['X1'])+' c= '+str(self.param['Color']))
-                #self.SED[self.param['z']]=(SED_time.wavelen[i],SED_time.flambda[i])
-                
-                if self.param['z']==0.5:
-                    ax = plt.gca().twinx()
-                    for i,band in enumerate(['u','g','r','i','z','y']):
-                        ax.plot(self.transmission.system[filtre].wavelen,self.transmission.system[filtre].sb,linestyle='--',color=filtercolors[filtre])
-            """
             self.transmission.Load_Atmosphere(airmass[i])
             trans=self.transmission.atmosphere[filtre]
-
+            
             flux_SN=sed.calcFlux(bandpass=trans)
+            
             if flux_SN >0:
                 mag_SN=-2.5 * np.log10(flux_SN / 3631.0)  
                 snr_m5_opsim,gamma_opsim=SignalToNoise.calcSNR_m5(mag_SN,trans,m5[i],photParams)
                 err_flux_SN=flux_SN/snr_m5_opsim
                 e_per_sec = sed.calcADU(bandpass=trans, photParams=photParams) #number of ADU counts for expTime
                     #e_per_sec = sed.calcADU(bandpass=self.transmission.lsst_atmos[filtre], photParams=photParams)
+                #print 'alors',e_per_sec,expTime[i],photParams.gain
                 e_per_sec/=expTime[i]/photParams.gain
+                #print 'alors b',e_per_sec
                 #print 'ref',filtre,i,mjds[i],e_per_sec
                     #self.lc[filtre].append(e_per_sec)
                 r.append((e_per_sec,mjds[i],flux_SN))
                 
                 #self.table_for_fit.add_row((mjds[i],flux_SN,err_flux_SN,'LSST::'+filtre,25,'ab'))
                 #self.table_for_fit.add_row((mjds[i],mag_SN,mag_SN/snr_m5_opsim,'LSST::'+filtre,25,'ab'))
-                self.table_obs.add_row((mjds[i],flux_SN,err_flux_SN*10,'LSST::'+filtre,2.5*np.log10(3631),'ab',airmass[i],m5[i],expTime[i],e_per_sec,self.telescope.mag_to_flux(m5[i],filtre)))
+                self.table_obs.add_row((mjds[i],flux_SN,err_flux_SN,'LSST::'+filtre,2.5*np.log10(3631),'ab',airmass[i],m5[i],expTime[i],e_per_sec,self.telescope.mag_to_flux(m5[i],filtre)))
                 #print 'there we go',filtre,e_per_sec,self.telescope.mag_to_flux(m5[i],filtre)
+            
+        #print 'total elapse time GEN LC',time.time()-time_begin
+        """
+        #time_begin=time.time()
+        fluxes=[]
+        transes=[]
+        seds=[]
+        #photParams=[]
+        
+        for i in range(len(SED_time.wavelen)):
+            
+            photParams=PhotometricParameters(nexp=expTime[i]/15.)
+            sed=Sed(wavelen=SED_time.wavelen[i],flambda=SED_time.flambda[i])
+            
+            self.transmission.Load_Atmosphere(airmass[i])
+            trans=self.transmission.atmosphere[filtre]
+            
+            flux_SN=sed.calcFlux(bandpass=trans)
+            
+            fluxes.append(flux_SN)
+            transes.append(trans)
+            seds.append(sed)
 
+        #print 'before',len(fluxes),len(seds),len(transes),len(m5),len(expTime),len(mjds),self.param['X1'],self.param['Color']
+        #print fluxes,mjds
+        fluxes=np.array(fluxes)
+        idx=fluxes > 0.
+        fluxes=fluxes[idx]
+        seds=np.array(seds)[idx]
+        transes=np.array(transes)[idx]
+        m5=m5[idx]
+        expTime=expTime[idx]
+        photParams=[PhotometricParameters(nexp=expTime[i]/15.) for i in range(len(expTime))]
+        airmass=airmass[idx]
+        mjds=mjds[idx]
 
+        #print 'allors',len(fluxes),len(seds),len(transes),len(m5),len(expTime),len(photParams),len(mjds)
+        #print fluxes,mjds
+        mags=-2.5 * np.log10(fluxes / 3631.0)  
+        
+        snr_m5_gamma=[SignalToNoise.calcSNR_m5(mags[i],transes[i],m5[i],photParams[i]) for i in range(len(mags))]
+        #snr_m5_opsim,gamma_opsim=[SignalToNoise.calcSNR_m5(mags[i],transes[i],m5_f[i],photParams_f[i]) for i in range(len(mags))]
+        err_fluxes=[fluxes[i]/snr_m5_gamma[i][0] for i in range(len(fluxes))]
+        e_per_sec = [seds[i].calcADU(bandpass=transes[i], photParams=photParams[i]) for i in range(len(transes))] #number of ADU counts for expTime
+        
+        e_per_sec=[e_per_sec[i]/(expTime[i]/photParams[i].gain) for i in range(len(e_per_sec))]
+
+        table_obs=Table()
+        table_obs.add_column(Column(mjds, name='time'))
+        table_obs.add_column(Column(fluxes, name='flux'))
+        table_obs.add_column(Column(err_fluxes, name='fluxerr'))
+        table_obs.add_column(Column(['LSST::'+filtre]*len(mjds), name='band'))
+        table_obs.add_column(Column([2.5*np.log10(3631)]*len(mjds),name='zp'))
+        table_obs.add_column(Column(['ab']*len(mjds),name='zpsys'))
+        table_obs.add_column(Column(airmass,name='airmass'))
+        table_obs.add_column(Column(m5,name='m5'))
+        table_obs.add_column(Column(expTime,name='expTime'))
+        table_obs.add_column(Column(e_per_sec,name='flux_e_sec'))
+        table_obs.add_column(Column(self.telescope.mag_to_flux(m5,filtre),name='flux_5sigma_e_sec'))
+        
+        #print 'total elapse time GEN LC b',time.time()-time_begin
+        #print 'volila',t
+
+        #Table(names=('time','flux','fluxerr','band','zp','zpsys','airmass','m5','expTime','flux_e_sec','flux_5sigma_e_sec')
         #print 'hello',r
         #self.lc[filtre]=np.rec.fromrecords(r, names = ['flux','mjd','flux_SN'])
 
@@ -198,7 +257,9 @@ class Generate_LC:
         else:
             res=None
         #out_q.put({filtre :(res,self.table_for_fit)})
-        out_q.put({filtre :(res,self.table_obs)})
+        
+        #out_q.put({filtre :(res,table_obs)})
+        out_q.put({filtre : table_obs})  
         return res
         #plt.show()
         

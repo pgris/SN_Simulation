@@ -13,18 +13,18 @@ from astropy.table import vstack,Table
 
 parser = OptionParser()
 
-parser.add_option("-N", "--nevts", type="int", default=100, help="filter [%default]")
+#parser.add_option("-N", "--nevts", type="int", default=100, help="filter [%default]")
 parser.add_option("-f", "--fieldname", type="string", default="WFD", help="filter [%default]")
 parser.add_option("-n", "--fieldid", type="int", default=309, help="filter [%default]")
 parser.add_option("-s", "--season", type="int", default=1, help="filter [%default]")
-parser.add_option("-z", "--zmin", type="float", default=0.0, help="filter [%default]")
-parser.add_option("-Z", "--zmax", type="float", default=0.1, help="filter [%default]")
-parser.add_option("--zrandom", type="string", default="yes", help="filter [%default]")
+parser.add_option("-z", "--z", type="float", default=0.0, help="filter [%default]")
+#parser.add_option("-Z", "--zmax", type="float", default=0.1, help="filter [%default]")
+#parser.add_option("--zrandom", type="string", default="yes", help="filter [%default]")
 parser.add_option("-x", "--stretch", type="float", default=2.0, help="filter [%default]")
 parser.add_option("-c", "--color", type="float", default=-0.2, help="filter [%default]")
 parser.add_option("-t", "--sntype", type="string", default="Ia", help="filter [%default]")
 parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter [%default]")
-parser.add_option("-r", "--T0random", type="string", default="yes", help="filter [%default]")
+#parser.add_option("-r", "--T0random", type="string", default="yes", help="filter [%default]")
 parser.add_option("--min_rf_phase", type="float", default=-15.0, help="filter [%default]")
 parser.add_option("--max_rf_phase", type="float", default=30., help="filter [%default]")
 
@@ -38,11 +38,11 @@ telescope=Telescope(atmos=True,airmass=1.2)
 
 fieldid=opts.fieldid
 num_season=opts.season
-N_sn=opts.nevts
-zmin=opts.zmin
-zmax=opts.zmax
-zrandom=opts.zrandom
-T0random=opts.T0random
+#N_sn=opts.nevts
+z=opts.z
+#zmax=opts.zmax
+#zrandom=opts.zrandom
+#T0random=opts.T0random
 X1=opts.stretch
 Color=opts.color
 min_rf_phase=opts.min_rf_phase
@@ -63,7 +63,7 @@ if not os.path.exists(outdir):
 print(len(myobs.seasons))
 
 if X1==-999. or Color==-999.:
-    if zmax < 0.1:
+    if z< 0.1:
         X1_Color_npzfile = np.load('Dist_X1_Color_low_z.npz','r')
     else:
         X1_Color_npzfile = np.load('Dist_X1_Color_high_z.npz','r')
@@ -91,24 +91,24 @@ z_vals=np.arange(zmin,zmax,0.01)
 
 date_obs=min_season+20.
 
-n_multi=5
-n_batch=N_sn/n_multi
+n_multi=8
+#n_batch=N_sn/n_multi
 
 #n_batch=len(T0_vals)
 #n_multi=len(z_vals)
-
-
-z=opts.zmin
 
 T0_vals=np.arange(min_season,max_season,0.1)
 
 #print 'ooo',len(T0_vals),X1_Color_npzfile['x1_vals'],X1_Color_npzfile['x1_weights'],len(X1_Color_npzfile['x1_vals']),X1_Color_npzfile['c_vals'],X1_Color_npzfile['c_weights']/np.min(X1_Color_npzfile['c_weights']),len(X1_Color_npzfile['c_weights'])
 
-for i0,T0 in enumerate([T0_vals[10]]):
-#for i0,T0 in enumerate(T0_vals):
+print 'Number of DayMax',len(T0_vals)
+#for i0,T0 in enumerate([T0_vals[10]]):
+for i0,T0 in enumerate(T0_vals):
     lcs=[]
-    name_for_output=opts.fieldname+'_'+str(fieldid)+'_'+str(zmin)+'_'+str(zmax)+'_X1_'+str(X1)+'_C_'+str(Color)+'_'+str(i0)
-    for i in range(40):        
+    name_for_output=opts.fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(X1)+'_C_'+str(Color)+'_'+str(i0)
+    #for i in range(40):        
+    for i in range(25):
+    #for i in range(1):
         result_queue = multiprocessing.Queue()
         
         for j in range(0,n_multi):
@@ -129,9 +129,6 @@ for i0,T0 in enumerate([T0_vals[10]]):
 
         for p in multiprocessing.active_children():
             p.join()
-
-    
-    
         
         for j in range(0,n_multi):
         #print 'hello there',resultdict[j].dtype

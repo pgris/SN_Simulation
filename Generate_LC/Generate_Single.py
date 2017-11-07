@@ -4,6 +4,7 @@ from astropy.table import vstack,Table
 from Fit_LC import *
 import cPickle as pkl
 
+
 class Generate_Single_LC:
     def __init__(self,z,T0,X1,Color,obs,telescope,inum,min_rf_phase,max_rf_phase,duration,date_obs,output_q):
         
@@ -30,6 +31,7 @@ class Generate_Single_LC:
         self.min_rf_phase=min_rf_phase
         self.max_rf_phase=max_rf_phase
         self.bands_rest = 'grizy'
+        #self.bands_rest = 'g'
 
         p=(obs['mjd']-T0)/(1.+z)
         idx = (p >= min_rf_phase)&(p<=max_rf_phase)
@@ -66,11 +68,18 @@ class Generate_Single_LC:
             p.join()
     
         self.tot_obs=None
+        """
         for b in self.bands_rest:
             if resultdict[b][1] is not None:
                 if self.tot_obs is None:
                     self.tot_obs=resultdict[b][1]
                 else:
                     self.tot_obs=vstack([self.tot_obs,resultdict[b][1]])
-
+        """
+        for b in self.bands_rest:
+            if resultdict[b] is not None:
+                if self.tot_obs is None:
+                    self.tot_obs=resultdict[b]
+                else:
+                    self.tot_obs=vstack([self.tot_obs,resultdict[b]])
         #self.outdict['observations']=self.tot_obs

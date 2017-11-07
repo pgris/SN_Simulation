@@ -60,7 +60,7 @@ class Fit_LC:
         #print 'what I have to fit',len(select)
         try:
             #print 'trying to fit',len(select)
-            res, fitted_model = sncosmo.fit_lc(select, self.SN_fit_model,['t0', 'x0', 'x1', 'c'],bounds={'z':(self.z-0.1, self.z+0.1)})
+            res, fitted_model = sncosmo.fit_lc(select, self.SN_fit_model,['t0', 'x0', 'x1', 'c'],bounds={'z':(self.z-0.001, self.z+0.001)})
 
             #self.sigma_c=res['errors']['c']
             mbfit=fitted_model._source.peakmag('bessellb','vega')
