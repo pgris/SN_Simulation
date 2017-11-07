@@ -8,6 +8,7 @@ class Observations:
         if filename != '':
             data=self.Load(filename)
             data.sort(order='mjd')
+            self.all_seasons=data
             self.seasons=self.Get_Seasons(data)
             self.Ra=np.unique(data['Ra'])[0]
             self.Dec=np.unique(data['Dec'])[0]
