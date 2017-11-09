@@ -20,12 +20,14 @@ class Generate_Single_LC:
         self.T0=T0
         self.X1=X1
         self.Color=Color
+        """
         self.outdict={}
         self.outdict=params
         self.outdict['status']='unkown'
         self.outdict['fit']=None
         self.outdict['mbsim']=-999.
         self.outdict['observations']=None
+        """
         self.duration=duration
         self.date_obs=date_obs
         self.min_rf_phase=min_rf_phase
@@ -42,8 +44,17 @@ class Generate_Single_LC:
             self.Gen_LC()
 
         #output_q.put({inum : (self.mysn.metadata,self.tot_obs)})
-        for name in self.mysn.metadata.colnames:
-            self.tot_obs.meta[name]=self.mysn.metadata[name]
+       
+        self.tot_obs.meta['X0']=self.mysn.X0
+        self.tot_obs.meta['z']=z
+        self.tot_obs.meta['DayMax']=T0
+        self.tot_obs.meta['X1']=X1
+        self.tot_obs.meta['Color']=Color
+        self.tot_obs.meta['mbsim']=self.mysn.mbsim
+        self.tot_obs.meta['duration']=self.duration
+        self.tot_obs.meta['min_rf_phase']=min_rf_phase
+        self.tot_obs.meta['max_rf_phase']=max_rf_phase
+        
         output_q.put({inum : self.tot_obs})
 
 

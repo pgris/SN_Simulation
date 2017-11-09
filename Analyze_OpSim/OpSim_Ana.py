@@ -546,7 +546,8 @@ for fieldid in fieldids:
     name='Observations_'+fieldname+'_'+str(fieldid)+'.txt'
     myobs[fieldid]=Observations(fieldid=fieldid, filename=thedir+'/'+name)
     
-Plot_Observations(myobs[744],'DD',744)
+#Plot_Observations(myobs[744],'DD',744)
+
 plt.show()
 r=[]
 bands='grizy'

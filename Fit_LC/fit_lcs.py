@@ -14,6 +14,8 @@ parser.add_option("-c", "--color", type="float", default=-0.2, help="filter [%de
 parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter [%default]")
 parser.add_option("--numfile", type="int", default=0, help="filter [%default]")
 parser.add_option("-s", "--season", type="int", default=-1, help="filter [%default]")
+parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
+parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
 
 opts, args = parser.parse_args()
 
@@ -25,10 +27,12 @@ stretch=opts.stretch
 color=opts.color
 dirmeas=opts.dirmeas
 numfile=opts.numfile
-
+T0min=opts.T0min
+T0max=opts.T0max
 
 dir_in='../'+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
-filename=fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)+'_'+str(numfile)+'.pkl'
+filename=fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)
+filename+='_'+str(T0min)+'_'+str(T0max)+'.pkl'
 thefile=dir_in+'/'+filename
 
 dir_out=dir_in.replace(dirmeas,'Fitted_Light_Curves')
@@ -46,6 +50,7 @@ telescope=Telescope(atmos=True,airmass=1.2)
 n_multi=10
 n_batch=len(list_lc)/n_multi
 
+n_batch=10
 time_begin=time.time()
 
 print len(list_lc)
@@ -70,14 +75,17 @@ for i in range(n_batch):
     for j in range(0,n_multi):
         #print 'hello there',resultdict[j].dtype
         if fit_stack is None:
+            #print 'hello there',resultdict[j].dtype
             fit_stack=resultdict[j]
         else:
             fit_stack=vstack([fit_stack,resultdict[j]])
     #break
 
+"""
 for fitval in fit_stack:
     print fitval['salt2.X1'],fitval['X1'],fitval['salt2.Color'],fitval['Color'],fitval['salt2.T0'],fitval['DayMax']
-   
+"""   
+
 pkl_file = open(name_out,'wb')
 pkl.dump(fit_stack, pkl_file)
 pkl_file.close() 

@@ -6,7 +6,7 @@ import numpy as np
 from collections import OrderedDict
 
 fieldname='DD'
-fieldid=290
+fieldid=744
 season=0
 X1=-999.
 Color=-999.
@@ -20,6 +20,7 @@ dirmeas='../Light_Curves/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
 
 files = glob.glob(dirmeas+'/'+fieldname+'_'+str(fieldid)+'*_X1_'+str(X1)+'_C_'+str(Color)+'*.pkl')
 
+files=[dirmeas+'/DD_744_0.1_X1_-999.0_C_-999.0_200_202.pkl']
 
 metadata=None
 r=[]
@@ -31,11 +32,12 @@ for fi in files:
     for val in resu:
         ro=[]
         names=[]
-        #print val.meta
-        for i, (key, value) in enumerate(val.meta.iteritems()):
-            ro.append(value[0])
+        print val.meta
+        for key in val.meta.keys():
+            print val.meta[key]
+            ro.append(val.meta[key])
             names.append(key)
-            #print 'hello',value[0]
+           
         r.append(tuple(ro))
         #print r,names
     

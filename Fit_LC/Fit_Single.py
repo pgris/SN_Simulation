@@ -40,7 +40,7 @@ class Fit_Single_LC:
             idxa = lc_sel['flux']/lc_sel['fluxerr']>5.
             lc_sel=lc_sel[idxa]
             if len(lc_sel)>0.:
-                self.Get_Quality_LC(lc_sel,lc.meta['DayMax'][0],lc.meta['z'][0])
+                self.Get_Quality_LC(lc_sel,lc.meta['DayMax'],lc.meta['z'])
                 #print self.dict_quality
                 #self.Plot_LC(lc_sel)
         
@@ -52,7 +52,7 @@ class Fit_Single_LC:
                     self.outdict['fit_status']='unknow'
                     self.Fit_LC(lc_sel)
                     #print self.outdict.keys()
-                    self.Get_Quality_LC(lc_sel,self.outdict['sncosmo_fitted']['t0'],lc.meta['z'][0])
+                    self.Get_Quality_LC(lc_sel,self.outdict['sncosmo_fitted']['t0'],lc.meta['z'])
                 else:
                     self.outdict['status']='no_obs'
                     self.outdict['fit_status']='unknow'
@@ -70,13 +70,13 @@ class Fit_Single_LC:
         print self.outdict
         """
 
+        #print self.Summary()
         output_q.put({inum : self.Summary()})
 
     def Get_Quality_LC(self,lc, T0, z):
 
         #estimate the number of LC points (5 sigma) before and after T0 - observer frame
        
-        
         lc.sort('time')
         #print lc.dtype
         n_bef_tot=0
@@ -141,14 +141,14 @@ class Fit_Single_LC:
             idx = lc['band']=='LSST::'+band
             lc_sel=lc[idx]
             axb[x[band]][y[band]].errorbar(lc_sel['time'],lc_sel['flux'],yerr=lc_sel['fluxerr'])
-            axb[x[band]][y[band]].errorbar([lc.meta['DayMax'][0]]*2,[min(lc_sel['flux']),max(lc_sel['flux'])],color='k')
+            axb[x[band]][y[band]].errorbar([lc.meta['DayMax']]*2,[min(lc_sel['flux']),max(lc_sel['flux'])],color='k')
         
         plt.show()
 
     def Fit_LC(self,lc):
         
         
-        myfit=Fit_LC(z=lc.meta['z'][0],telescope=self.telescope,Plot=False)
+        myfit=Fit_LC(z=lc.meta['z'],telescope=self.telescope,Plot=False)
         #print 'going to fit',len(self.lc),self.lc.dtype
 
         #self.outdict['m5sigma']=np.median(self.lc['m5'])
@@ -190,6 +190,7 @@ class Fit_Single_LC:
         resu['salt2.X0']=-999.
         resu['salt2.X1']=-999.
         resu['salt2.Color']=-999.
+        resu['salt2.CovT0T0']=-999.
         resu['salt2.CovX1X1']=-999.
         resu['salt2.CovX0X0']=-999.
         resu['salt2.Covmbmb']=-999.
@@ -220,6 +221,7 @@ class Fit_Single_LC:
                     resu['salt2.CovX0X1']=self.outdict['sncosmo_res']['covariance'][corr['x0']][corr['x1']]
                     resu['salt2.CovColorX0']=self.outdict['sncosmo_res']['covariance'][corr['c']][corr['x0']]
                     resu['salt2.CovColorX1']=self.outdict['sncosmo_res']['covariance'][corr['c']][corr['x1']]
+                    resu['salt2.CovT0T0']=self.outdict['sncosmo_res'].errors['t0']**2
                     for val in ['salt2.Covmbmb','salt2.CovColormb','salt2.CovX1mb']:
                         resu[val]=self.outdict['recalc'][val]
 
@@ -245,8 +247,8 @@ class Fit_Single_LC:
         print 'hhh',pol
         """
         for key in self.lc.meta.keys():
-            #print key,self.lc.meta[key].quantity
-            t.add_column(Column(self.lc.meta[key].quantity, name=key))
+            #print key,self.lc.meta[key]
+            t.add_column(Column([self.lc.meta[key]], name=key))
         for key,val in resu.items():
             t.add_column(Column([val], name=key))
 

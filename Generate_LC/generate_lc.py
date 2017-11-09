@@ -25,8 +25,10 @@ parser.add_option("-c", "--color", type="float", default=-0.2, help="filter [%de
 parser.add_option("-t", "--sntype", type="string", default="Ia", help="filter [%default]")
 parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter [%default]")
 #parser.add_option("-r", "--T0random", type="string", default="yes", help="filter [%default]")
-parser.add_option("--min_rf_phase", type="float", default=-15.0, help="filter [%default]")
-parser.add_option("--max_rf_phase", type="float", default=30., help="filter [%default]")
+parser.add_option("--min_rf_phase", type="float", default=-20.0, help="filter [%default]")
+parser.add_option("--max_rf_phase", type="float", default=60., help="filter [%default]")
+parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
+parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
 
 #parser.add_option("-r", "--rolling", type="int", default=0, help="filter [%default]")
 #parser.add_option("--nrolling", type="int", default=0, help="filter [%default]")
@@ -47,6 +49,8 @@ X1=opts.stretch
 Color=opts.color
 min_rf_phase=opts.min_rf_phase
 max_rf_phase=opts.max_rf_phase
+T0min=opts.T0min
+T0max=opts.T0max
 
 OpSim_Logs_dir=os.getenv('OPSIM_LOGS')
 filename=OpSim_Logs_dir+'/'+opts.dirmeas+'/Observations_'+opts.fieldname+'_'+str(fieldid)+'.txt'
@@ -91,7 +95,7 @@ z_vals=np.arange(zmin,zmax,0.01)
 
 date_obs=min_season+20.
 
-n_multi=8
+n_multi=4
 #n_batch=N_sn/n_multi
 
 #n_batch=len(T0_vals)
@@ -102,12 +106,12 @@ T0_vals=np.arange(min_season,max_season,0.1)
 #print 'ooo',len(T0_vals),X1_Color_npzfile['x1_vals'],X1_Color_npzfile['x1_weights'],len(X1_Color_npzfile['x1_vals']),X1_Color_npzfile['c_vals'],X1_Color_npzfile['c_weights']/np.min(X1_Color_npzfile['c_weights']),len(X1_Color_npzfile['c_weights'])
 
 print 'Number of DayMax',len(T0_vals)
-#for i0,T0 in enumerate([T0_vals[10]]):
-for i0,T0 in enumerate(T0_vals):
-    lcs=[]
-    name_for_output=opts.fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(X1)+'_C_'+str(Color)+'_'+str(i0)
+lcs=[]
+name_for_output=opts.fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(X1)+'_C_'+str(Color)+'_'+str(T0min)+'_'+str(T0max)
+#for i0,T0 in enumerate([T0_vals[T0min]]):
+for T0 in T0_vals[T0min:T0max]:
     #for i in range(40):        
-    for i in range(25):
+    for i in range(50):
     #for i in range(1):
         result_queue = multiprocessing.Queue()
         
@@ -135,9 +139,9 @@ for i0,T0 in enumerate(T0_vals):
             lcs.append(resultdict[j])
 
 
-    pkl_file = open(outdir+'/'+name_for_output+'.pkl','wb')
-    pkl.dump(lcs, pkl_file)
-    pkl_file.close()
+pkl_file = open(outdir+'/'+name_for_output+'.pkl','wb')
+pkl.dump(lcs, pkl_file)
+pkl_file.close()
 
 """
 for i in range(0,n_batch):

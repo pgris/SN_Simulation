@@ -122,7 +122,7 @@ class Generate_LC:
 
         #self.metadata=np.rec.fromrecords([(self.X0,self.param['X1'],self.param['Color'],self.param['DayMax'],self.param['z'],self.mbsim)], names = ['X0','X1','Color','DayMax','z','mbsim'])
         
-        self.metadata=Table(rows=[(self.X0,self.param['X1'],self.param['Color'],self.param['DayMax'],self.param['z'],self.mbsim)], names=('X0','X1','Color','DayMax','z','mbsim'), meta={'name': 'metadata'},dtype=tuple(['f8']*6))
+        #self.metadata=Table(rows=[(self.X0,self.param['X1'],self.param['Color'],self.param['DayMax'],self.param['z'],self.mbsim)], names=('X0','X1','Color','DayMax','z','mbsim'), meta={'name': 'metadata'},dtype=tuple(['f8']*6))
 
     def __call__(self,mjds,airmass,m5,filtre,expTime,out_q):
 

@@ -19,6 +19,8 @@ parser.add_option("-c", "--color", type="float", default=-0.2, help="filter [%de
 parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter [%default]")
 #parser.add_option("-r", "--T0random", type="string", default="No", help="filter [%default]")
 #parser.add_option("--zrandom", type="string", default="yes", help="filter [%default]")
+parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
+parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
 
 opts, args = parser.parse_args()
 
@@ -34,8 +36,10 @@ color=opts.color
 dirmeas=opts.dirmeas
 #T0random=opts.T0random
 #zrandom=opts.zrandom
+T0min=opts.T0min
+T0max=opts.T0max
 
-cmd='python generate_lc.py --z '+str(z)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas
+cmd='python generate_lc.py --z '+str(z)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --T0min '+str(T0min)+' --T0max '+str(T0max)
 
 cwd = os.getcwd()
 dirScript= cwd + "/scripts"
@@ -47,11 +51,11 @@ dirLog = cwd + "/logs"
 if not os.path.isdir(dirLog) :
     os.makedirs(dirLog)    
     
-name_id=fieldname+'_'+str(fieldid)+'_'+str(z)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)
+name_id=fieldname+'_'+str(fieldid)+'_'+str(z)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)
 log = dirLog + '/'+name_id+'.log'
 
 
-qsub = "qsub -P P_lsst -l sps=1,ct=00:50:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
+qsub = "qsub -P P_lsst -l sps=1,ct=03:00:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
 scriptName = dirScript+'/'+name_id+'.sh'
 
 script = open(scriptName,"w")
