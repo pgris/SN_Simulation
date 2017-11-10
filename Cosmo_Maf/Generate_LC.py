@@ -124,17 +124,17 @@ class Generate_LC:
         
         #self.metadata=Table(rows=[(self.X0,self.param['X1'],self.param['Color'],self.param['DayMax'],self.param['z'],self.mbsim)], names=('X0','X1','Color','DayMax','z','mbsim'), meta={'name': 'metadata'},dtype=tuple(['f8']*6))
 
-    def __call__(self,mjds,airmass,m5,filtre,expTime,out_q):
+    def __call__(self,mjds,airmass,m5,filtre,expTime,out_q=None):
 
         #print 'hello here',len(mjds),filtre
-        
+        #time_begin=time.time()
         fluxes=10.*self.SN.flux(mjds,self.wave)
         
         wavelength=self.wave/10.
         
         wavelength=np.repeat(wavelength[np.newaxis,:], len(fluxes), 0)
         SED_time = Sed(wavelen=wavelength, flambda=fluxes)
-        
+        #print 'total elapse time seds',time.time()-time_begin
         r=[]
         #visittime=expTime
         """
@@ -188,25 +188,33 @@ class Generate_LC:
         #time_begin=time.time()
         fluxes=[]
         transes=[]
-        seds=[]
-        #photParams=[]
+        seds=[Sed(wavelen=SED_time.wavelen[i],flambda=SED_time.flambda[i]) for i in range(len(SED_time.wavelen))]
         
+        #photParams=[]
+        #time_begin=time.time()
+        """
         for i in range(len(SED_time.wavelen)):
             
-            photParams=PhotometricParameters(nexp=expTime[i]/15.)
-            sed=Sed(wavelen=SED_time.wavelen[i],flambda=SED_time.flambda[i])
+            #photParams=PhotometricParameters(nexp=expTime[i]/15.)
+            #sed=Sed(wavelen=SED_time.wavelen[i],flambda=SED_time.flambda[i])
             
             self.transmission.Load_Atmosphere(airmass[i])
             trans=self.transmission.atmosphere[filtre]
             
-            flux_SN=sed.calcFlux(bandpass=trans)
+            #flux_SN=sed.calcFlux(bandpass=trans)
             
-            fluxes.append(flux_SN)
+            #fluxes.append(flux_SN)
             transes.append(trans)
-            seds.append(sed)
-
+            #seds.append(sed)
+        """
+        self.transmission.Load_Atmosphere(np.median(airmass))
+        transes=[self.transmission.atmosphere[filtre[i][-1]] for i in range(len(SED_time.wavelen))]
+        #print 'total elapse time sed',time.time()-time_begin,len(transes)    
+        fluxes=[seds[i].calcFlux(bandpass=transes[i]) for i in range(len(SED_time.wavelen))]
+        #print 'total elapse time sed',time.time()-time_begin
         #print 'before',len(fluxes),len(seds),len(transes),len(m5),len(expTime),len(mjds),self.param['X1'],self.param['Color']
         #print fluxes,mjds
+        #time_begin=time.time()
         fluxes=np.array(fluxes)
         idx=fluxes > 0.
         fluxes=fluxes[idx]
@@ -217,31 +225,45 @@ class Generate_LC:
         photParams=[PhotometricParameters(nexp=expTime[i]/15.) for i in range(len(expTime))]
         airmass=airmass[idx]
         mjds=mjds[idx]
+        filtre=filtre[idx]
 
         #print 'allors',len(fluxes),len(seds),len(transes),len(m5),len(expTime),len(photParams),len(mjds)
         #print fluxes,mjds
         mags=-2.5 * np.log10(fluxes / 3631.0)  
-        
-        snr_m5_gamma=[SignalToNoise.calcSNR_m5(mags[i],transes[i],m5[i],photParams[i]) for i in range(len(mags))]
+        gamma = np.asarray([SignalToNoise.calcGamma(transes[i],m5[i],photParams[i]) for i in range(len(mags))])
+        x=np.power(10.,0.4*(mags-m5))
+        snr_m5_gamma=1./np.asarray(np.sqrt((0.04-gamma)*x+gamma*(x**2)))
+        #snr_m5_gamma_orig=[SignalToNoise.calcSNR_m5(mags[i],transes[i],m5[i],photParams[i]) for i in range(len(mags))]
+        #print 'hhh',snr_m5_gamma,snr_m5_gamma_orig
         #snr_m5_opsim,gamma_opsim=[SignalToNoise.calcSNR_m5(mags[i],transes[i],m5_f[i],photParams_f[i]) for i in range(len(mags))]
-        err_fluxes=[fluxes[i]/snr_m5_gamma[i][0] for i in range(len(fluxes))]
+        err_fluxes=fluxes/snr_m5_gamma
+        #err_fluxes_orig=[fluxes[i]/snr_m5_gamma_orig[i][0] for i in range(len(fluxes))]
+        
         e_per_sec = [seds[i].calcADU(bandpass=transes[i], photParams=photParams[i]) for i in range(len(transes))] #number of ADU counts for expTime
         
         e_per_sec=[e_per_sec[i]/(expTime[i]/photParams[i].gain) for i in range(len(e_per_sec))]
+        
 
+        #gamma = np.asarray([SignalToNoise.calcGamma(transes[i],m5[i],photParams[i]) for i in range(len(mags))])
+        #x=np.power(10.,0.4*(mags-m5))
+        #err=(0.04-gamma)*x+gamma*(x**2)
+        #print np.sqrt(err)*fluxes,err_fluxes,fluxes
+        #print mags,self.telescope.mag_to_flux(mags,filtre)
         table_obs=Table()
         table_obs.add_column(Column(mjds, name='time'))
         table_obs.add_column(Column(fluxes, name='flux'))
         table_obs.add_column(Column(err_fluxes, name='fluxerr'))
-        table_obs.add_column(Column(['LSST::'+filtre]*len(mjds), name='band'))
+        #table_obs.add_column(Column(err_fluxes/err_fluxes_orig, name='test'))
+        #table_obs.add_column(Column(['LSST::'+filtre]*len(mjds), name='band'))
+        table_obs.add_column(Column(filtre, name='band'))
         table_obs.add_column(Column([2.5*np.log10(3631)]*len(mjds),name='zp'))
         table_obs.add_column(Column(['ab']*len(mjds),name='zpsys'))
         table_obs.add_column(Column(airmass,name='airmass'))
         table_obs.add_column(Column(m5,name='m5'))
         table_obs.add_column(Column(expTime,name='expTime'))
         table_obs.add_column(Column(e_per_sec,name='flux_e_sec'))
-        table_obs.add_column(Column(self.telescope.mag_to_flux(m5,filtre),name='flux_5sigma_e_sec'))
-        
+        #table_obs.add_column(Column(self.telescope.mag_to_flux(m5,filtre),name='flux_5sigma_e_sec'))
+        #print 'total elapse time table',time.time()-time_begin
         #print 'total elapse time GEN LC b',time.time()-time_begin
         #print 'volila',t
 
@@ -259,8 +281,9 @@ class Generate_LC:
         #out_q.put({filtre :(res,self.table_for_fit)})
         
         #out_q.put({filtre :(res,table_obs)})
-        out_q.put({filtre : table_obs})  
-        return res
+        if out_q is not None:
+            out_q.put({filtre : table_obs})  
+        return table_obs
         #plt.show()
         
   

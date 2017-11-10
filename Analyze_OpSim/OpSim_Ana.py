@@ -1,6 +1,10 @@
 import numpy as np
 from Observations import *
 import pylab as plt
+from matplotlib import cm
+import sncosmo
+from Telescope import *
+from astropy import (cosmology, units as u, constants as const)
 
 def median(sel,var):
 
@@ -510,7 +514,7 @@ def Plot_Observations(obs,fieldname,fieldid):
     axc.scatter(obs.all_seasons['mjd'],obs.all_seasons['m5sigmadepth'],s=80,facecolors='none', edgecolors='r')
     axc.set_xlim([np.min(obs.all_seasons['mjd'])-50.,np.max(obs.all_seasons['mjd'])+50.])
     axc.set_xlabel('MJD [day]',{'fontsize': fontsize})
-    axc.set_ylabel('5$\sigma$-depth',{'fontsize': fontsize})
+    axc.set_ylabel('$m_{5\sigma}$ [mag]',{'fontsize': fontsize})
     plt.gcf().savefig('Obs_Plots/m5_vs_mjd_'+fieldname+'_'+str(fieldid)+'.png')
 
     for i in range(len(obs.seasons)):
@@ -520,8 +524,131 @@ def Plot_Observations(obs,fieldname,fieldid):
         axc.plot(obs.seasons[i]['mjd'],obs.seasons[i]['m5sigmadepth'],'*r')
         axc.set_xlim([np.min(obs.all_seasons['mjd'])-50.,np.max(obs.all_seasons['mjd'])+50.])
         axc.set_xlabel('MJD [day]',{'fontsize': fontsize})
-        axc.set_ylabel('5$\sigma$-depth [mag]',{'fontsize': fontsize})
+        axc.set_ylabel('$m_{5\sigma}$ [mag]',{'fontsize': fontsize})
         plt.gcf().savefig('Obs_Plots/m5_vs_mjd_'+fieldname+'_'+str(fieldid)+'_season_'+str(i+1)+'.png')
+
+    
+    Plot_Obs_per_filter(data=obs.seasons[0],fieldname=fieldname,fieldid=fieldid,season=1)
+
+def Plot_Obs_per_filter(data=None, fieldname='',fieldid=0,season=0, flux_name='m5sigmadepth',xfigsize=None, yfigsize=None, figtext=None,figtextsize=1.,ncol=2,color=None,cmap=None, cmap_lims=(3000., 10000.)):
+       
+    telescope=Telescope(airmass=np.median(1.2))
+
+    transmission=telescope.throughputs
+    
+    for filtre in 'ugrizy':
+        band=sncosmo.Bandpass(transmission.atmosphere[filtre].wavelen,transmission.atmosphere[filtre].sb, name='LSSTPG::'+filtre,wave_unit=u.nm)
+        sncosmo.registry.register(band)
+
+    toff=0.
+    bands=set(data['band'])
+    
+    #tmin, tmax = [], []
+    if data is not None:
+        tmin=np.min(data['mjd']) - 10.
+        tmax=np.max(data['mjd']) + 10.
+        #tmin.append(np.min(data['mjd']) - 10.)
+        #tmax.append(np.max(data['mjd']) + 10.)
+    print 'hello',tmin,tmax
+
+        # Calculate layout of figure (columns, rows, figure size). We have to
+        # calculate these explicitly because plt.tight_layout() doesn't space the
+        # subplots as we'd like them when only some of them have xlabels/xticks.
+    wspace = 0.6  # All in inches.
+    hspace = 0.3
+    lspace = 1.0
+    bspace = 0.7
+    trspace = 0.2
+    nrow = (len(bands) - 1) // ncol + 1
+    if xfigsize is None and yfigsize is None:
+        hpanel = 2.25
+        wpanel = 3.
+    elif xfigsize is None:
+        hpanel = (yfigsize - figtextsize - bspace - trspace -
+                  hspace * (nrow - 1)) / nrow
+        wpanel = hpanel * 3. / 2.25
+    elif yfigsize is None:
+        wpanel = (xfigsize - lspace - trspace - wspace * (ncol - 1)) / ncol
+        hpanel = wpanel * 2.25 / 3.
+    else:
+        raise ValueError('cannot specify both xfigsize and yfigsize')
+
+    figsize = (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace,
+               bspace + hpanel * nrow + hspace * (nrow - 1) + trspace +
+               figtextsize)  
+
+        # Create the figure and axes.
+    fig, axes = plt.subplots(nrow, ncol, figsize=figsize, squeeze=False)
+    fig.suptitle(fieldname+' Field '+str(fieldid)+' - Season '+str(season))
+
+    fig.subplots_adjust(left=lspace / figsize[0],
+                        bottom=bspace / figsize[1],
+                        right=1. - trspace / figsize[0],
+                        top=1. - (figtextsize + trspace) / figsize[1],
+                        wspace=wspace / wpanel,
+                        hspace=hspace / hpanel)
+        # Color options.
+    if color is None:
+        if cmap is None:
+            cmap = cm.get_cmap('jet_r')
+        # Loop over bands
+    bands = list(bands)
+    waves = [sncosmo.get_bandpass(b).wave_eff for b in bands]
+    waves_and_bands = sorted(zip(waves, bands))
+
+    for axnum in range(ncol * nrow):
+        row = axnum // ncol
+        col = axnum % ncol
+        ax = axes[row, col]
+        
+        if axnum >= len(waves_and_bands):
+            ax.set_visible(False)
+            ax.set_frame_on(False)
+            continue
+
+        wave, band = waves_and_bands[axnum]
+
+        bandname_coords = (0.92, 0.92)
+        bandname_ha = 'right'
+        if color is None:
+            bandcolor = cmap((cmap_lims[1] - wave) /
+                                 (cmap_lims[1] - cmap_lims[0]))
+        else:
+            bandcolor = color
+
+        if data is not None:
+            mask = data['band'] == band
+            time = data['mjd'][mask]
+            flux = data[flux_name][mask]
+            ax.errorbar(time, flux, ls='None',
+                        color=bandcolor, marker='.', markersize=3.)    
+            # Band name in corner
+            ax.text(bandname_coords[0], bandname_coords[1], band,
+                    color='k', ha=bandname_ha, va='top', transform=ax.transAxes)
+
+            ax.axhline(y=0., ls='--', c='k')  # horizontal line at flux = 0.
+            ax.set_xlim((tmin, tmax))
+            ax.set_ylim((np.min(flux)-1.,np.max(flux)+1.))
+            if (len(bands) - axnum - 1) < ncol:
+                ax.set_xlabel('time')
+               
+            else:
+                for l in ax.get_xticklabels():
+                    l.set_visible(False)
+            if col == 0:
+                if flux_name == 'flux':
+                    ax.set_ylabel('flux ($ZP_{{{0}}} = {1}$)'
+                                  .format(sncosmo.get_magsystem(zpsys).name.upper(), zp))
+                if flux_name == 'flux_e_sec':
+                   ax.set_ylabel('flux (e/sec)')
+                
+                if flux_name == 'm5sigmadepth':
+                    ax.set_ylabel('$m_{5\sigma}$ [mag]')
+
+
+
+
+
 
 dirmeas='Mean_Obs_newrefs'
 dirmeas='DD'
@@ -546,7 +673,7 @@ for fieldid in fieldids:
     name='Observations_'+fieldname+'_'+str(fieldid)+'.txt'
     myobs[fieldid]=Observations(fieldid=fieldid, filename=thedir+'/'+name)
     
-#Plot_Observations(myobs[744],'DD',744)
+Plot_Observations(myobs[744],'DD',744)
 
 plt.show()
 r=[]

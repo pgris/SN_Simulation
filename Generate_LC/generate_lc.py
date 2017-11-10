@@ -66,12 +66,18 @@ if not os.path.exists(outdir):
 
 print(len(myobs.seasons))
 
+tab_X1_c=None
+
 if X1==-999. or Color==-999.:
+    pkl_file = open('Map_X1_C.pkl','rb')
+    tab_X1_c=pkl.load(pkl_file)
+
     if z< 0.1:
-        X1_Color_npzfile = np.load('Dist_X1_Color_low_z.npz','r')
+        idx= tab_X1_c['type'] == 'low_z '
     else:
-        X1_Color_npzfile = np.load('Dist_X1_Color_high_z.npz','r')
-        
+        idx= tab_X1_c['type'] == 'high_z'
+    
+    tab_X1_c=tab_X1_c[idx]
 
 #num_season=1
 
@@ -95,35 +101,56 @@ z_vals=np.arange(zmin,zmax,0.01)
 
 date_obs=min_season+20.
 
-n_multi=4
+n_multi=10
+
+if X1==-999 and Color != -999.:
+    idx= tab_X1_c['Color']== set(tab_X1_c['Color'])[0]
+    tab_X1_c = tab_X1_c[idx]
+
+if Color ==-999 and X1!= -999.:
+    idx= tab_X1_c['X1']== set(tab_X1_c['X1'])[0]
+    tab_X1_c = tab_X1_c[idx]
+
+if Color !=-999 and X1!= -999.:
+    n_multi=1
+    tab_X1_c = np.rec.fromrecords((X1,1.,Color,1.,''),names=['X1','X1_weight','Color','Color_weight','type'])
+
 #n_batch=N_sn/n_multi
 
 #n_batch=len(T0_vals)
 #n_multi=len(z_vals)
 
+#n_multi=1
+print 'alors tab',len(tab_X1_c)
+nbatch=len(tab_X1_c)/n_multi
+nbatch+=1
+
 T0_vals=np.arange(min_season,max_season,0.1)
 
 #print 'ooo',len(T0_vals),X1_Color_npzfile['x1_vals'],X1_Color_npzfile['x1_weights'],len(X1_Color_npzfile['x1_vals']),X1_Color_npzfile['c_vals'],X1_Color_npzfile['c_weights']/np.min(X1_Color_npzfile['c_weights']),len(X1_Color_npzfile['c_weights'])
 
-print 'Number of DayMax',len(T0_vals)
+print 'Number of DayMax',len(T0_vals),nbatch
 lcs=[]
 name_for_output=opts.fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(X1)+'_C_'+str(Color)+'_'+str(T0min)+'_'+str(T0max)
 #for i0,T0 in enumerate([T0_vals[T0min]]):
+ival=0
 for T0 in T0_vals[T0min:T0max]:
     #for i in range(40):        
-    for i in range(50):
+    for i in range(nbatch):
     #for i in range(1):
+        print 'There man',T0,ival,ival+n_multi
         result_queue = multiprocessing.Queue()
-        
+        if ival+n_multi >= len(tab_X1_c):
+            n_multi=len(tab_X1_c)-ival-1
         for j in range(0,n_multi):
-            X1_val=X1
-            Color_val=Color
-            if X1 == -999.:
-                X1_val=np.random.choice(X1_Color_npzfile['x1_vals'],1,p=X1_Color_npzfile['x1_weights'])[0]
-            if Color==-999.:
-                Color_val=np.random.choice(X1_Color_npzfile['c_vals'],1,p=X1_Color_npzfile['c_weights'])[0]
-                
-            p=multiprocessing.Process(name='Subprocess-'+str(i),target=Generate_Single_LC,args=(z,T0,X1_val,Color_val,myseason,telescope,j,min_rf_phase,max_rf_phase,duration,date_obs,result_queue))
+            
+            X1_val=tab_X1_c['X1'][ival]
+            X1_weight=tab_X1_c['X1_weight'][ival]
+            Color_val=tab_X1_c['Color'][ival]
+            Color_weight=tab_X1_c['Color_weight'][ival]
+            ival+=1
+            #print 'There man',T0,X1_val,Color_val,i
+            p=multiprocessing.Process(name='Subprocess-'+str(j),target=Generate_Single_LC,args=(z,T0,X1_val,X1_weight,Color_val,Color_weight,myseason,telescope,j,min_rf_phase,max_rf_phase,duration,date_obs,result_queue))
             
             p.start()
     

@@ -52,24 +52,29 @@ class Visu_LC:
 
         print 'hello',len(tot_lc)
 
-        for lc in tot_lc:
-            if lc.meta['X1']==sn_id['X1'] and lc.meta['Color']==sn_id['Color'] and lc.meta['DayMax']==sn_id['DayMax']:
-                print 'yes found'
-                print lc
-                self.Plot_LC_Points(data=lc,flux_name='flux')
-                plt.show()
-                #self.Plot_LC(lc,sn_id)
-                break
 
-    def Plot_LC_Points(self,data=None, flux_name='flux',xfigsize=None, yfigsize=None, figtext=None,figtextsize=1.,ncol=2,color=None,cmap=None, cmap_lims=(3000., 10000.),zp=25., zpsys='ab',):
-       
-        telescope=Telescope(airmass=np.median(data['airmass']))
+        telescope=Telescope(airmass=np.median(1.2))
 
         transmission=telescope.throughputs
 
         for filtre in 'ugrizy':
             band=sncosmo.Bandpass(transmission.atmosphere[filtre].wavelen,transmission.atmosphere[filtre].sb, name='LSST::'+filtre,wave_unit=u.nm)
             sncosmo.registry.register(band)
+
+
+        for lc in tot_lc:
+            if lc.meta['X1']==sn_id['X1'] and lc.meta['Color']==sn_id['Color'] and lc.meta['DayMax']==sn_id['DayMax']:
+                print 'yes found'
+                print lc
+                self.Plot_LC_Points(data=lc,flux_name='flux_e_sec')
+                self.Plot_LC(lc,sn_id)
+                break
+
+        plt.show()
+
+    def Plot_LC_Points(self,data=None, flux_name='flux',xfigsize=None, yfigsize=None, figtext=None,figtextsize=1.,ncol=2,color=None,cmap=None, cmap_lims=(3000., 10000.),zp=25., zpsys='ab',):
+       
+        
 
         toff=data.meta['DayMax']
         bands=set(data['band'])
@@ -174,16 +179,6 @@ class Visu_LC:
 
 
     def Plot_LC(self,lc,sn):
-
-
-        telescope=Telescope(airmass=np.median(lc['airmass']))
-
-        transmission=telescope.throughputs
-
-        for filtre in 'ugrizy':
-            band=sncosmo.Bandpass(transmission.atmosphere[filtre].wavelen,transmission.atmosphere[filtre].sb, name='LSST::'+filtre,wave_unit=u.nm)
-            sncosmo.registry.register(band)
-
 
         dust = sncosmo.OD94Dust()
         fitted_model=sncosmo.Model(source='salt2-extended', effects=[dust, dust],

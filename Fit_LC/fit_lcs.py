@@ -12,10 +12,11 @@ parser.add_option("-i", "--fieldid", type="int", default=309, help="filter [%def
 parser.add_option("-x", "--stretch", type="float", default=2.0, help="filter [%default]")
 parser.add_option("-c", "--color", type="float", default=-0.2, help="filter [%default]")
 parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter [%default]")
-parser.add_option("--numfile", type="int", default=0, help="filter [%default]")
+#parser.add_option("--numfile", type="int", default=0, help="filter [%default]")
 parser.add_option("-s", "--season", type="int", default=-1, help="filter [%default]")
 parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
 parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
+parser.add_option("-t", "--sntype", type="string", default='Ia', help="filter [%default]")
 
 opts, args = parser.parse_args()
 
@@ -26,10 +27,10 @@ season=opts.season
 stretch=opts.stretch
 color=opts.color
 dirmeas=opts.dirmeas
-numfile=opts.numfile
+#numfile=opts.numfile
 T0min=opts.T0min
 T0max=opts.T0max
-
+sntype=opts.sntype
 dir_in='../'+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
 filename=fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)
 filename+='_'+str(T0min)+'_'+str(T0max)+'.pkl'
@@ -50,7 +51,7 @@ telescope=Telescope(atmos=True,airmass=1.2)
 n_multi=10
 n_batch=len(list_lc)/n_multi
 
-n_batch=10
+#n_batch=10
 time_begin=time.time()
 
 print len(list_lc)
@@ -59,6 +60,8 @@ fit_stack=None
 #for lc in list_lc:
 for i in range(n_batch):
     result_queue = multiprocessing.Queue()
+    if (i%100) == 0:
+        print 'Fitting',i
     for j in range(0,n_multi):
         num=j+n_multi*i
         p=multiprocessing.Process(name='Subprocess-'+str(j),target=Fit_Single_LC,args=(list_lc[num],telescope,j,result_queue))

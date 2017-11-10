@@ -6,7 +6,7 @@ import cPickle as pkl
 
 
 class Generate_Single_LC:
-    def __init__(self,z,T0,X1,Color,obs,telescope,inum,min_rf_phase,max_rf_phase,duration,date_obs,output_q):
+    def __init__(self,z,T0,X1,X1_weight,Color,Color_weight,obs,telescope,inum,min_rf_phase,max_rf_phase,duration,date_obs,output_q):
         
         params={}
         params['z']=z
@@ -19,7 +19,9 @@ class Generate_Single_LC:
         self.z=z
         self.T0=T0
         self.X1=X1
+        self.X1_weight=X1_weight
         self.Color=Color
+        self.Color_weight=Color_weight
         """
         self.outdict={}
         self.outdict=params
@@ -33,7 +35,7 @@ class Generate_Single_LC:
         self.min_rf_phase=min_rf_phase
         self.max_rf_phase=max_rf_phase
         self.bands_rest = 'grizy'
-        #self.bands_rest = 'g'
+        self.bands_rest = 'g'
 
         p=(obs['mjd']-T0)/(1.+z)
         idx = (p >= min_rf_phase)&(p<=max_rf_phase)
@@ -49,7 +51,9 @@ class Generate_Single_LC:
         self.tot_obs.meta['z']=z
         self.tot_obs.meta['DayMax']=T0
         self.tot_obs.meta['X1']=X1
+        self.tot_obs.meta['X1_weight']=X1_weight
         self.tot_obs.meta['Color']=Color
+        self.tot_obs.meta['Color_weight']=Color_weight
         self.tot_obs.meta['mbsim']=self.mysn.mbsim
         self.tot_obs.meta['duration']=self.duration
         self.tot_obs.meta['min_rf_phase']=min_rf_phase
@@ -60,13 +64,14 @@ class Generate_Single_LC:
 
     def Gen_LC(self):
 
+        """
         result_queue = multiprocessing.Queue()
         process=[]
 
         for b in self.bands_rest:
             idx= self.obs['band']=='LSSTPG::'+b
             sel=self.obs[idx]
-            #print 'aiaiai',b,np.median(sel['m5sigmadepth'])
+            print 'aiaiai',b,np.median(sel['m5sigmadepth'])
             p=multiprocessing.Process(name='Subprocess-'+b,target=self.mysn,args=(sel['mjd'],sel['airmass'],sel['m5sigmadepth'],b,sel['exptime'],result_queue))
             process.append(p)
             p.start()
@@ -79,14 +84,7 @@ class Generate_Single_LC:
             p.join()
     
         self.tot_obs=None
-        """
-        for b in self.bands_rest:
-            if resultdict[b][1] is not None:
-                if self.tot_obs is None:
-                    self.tot_obs=resultdict[b][1]
-                else:
-                    self.tot_obs=vstack([self.tot_obs,resultdict[b][1]])
-        """
+    
         for b in self.bands_rest:
             if resultdict[b] is not None:
                 if self.tot_obs is None:
@@ -94,3 +92,7 @@ class Generate_Single_LC:
                 else:
                     self.tot_obs=vstack([self.tot_obs,resultdict[b]])
         #self.outdict['observations']=self.tot_obs
+        """
+        self.tot_obs=self.mysn(self.obs['mjd'],self.obs['airmass'],self.obs['m5sigmadepth'],self.obs['band'],self.obs['exptime'])
+
+       
