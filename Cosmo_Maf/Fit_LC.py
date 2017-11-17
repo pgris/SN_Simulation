@@ -89,7 +89,7 @@ class Fit_LC:
                 #print 'crashed'
                 #self.Plot_bands(select)
                 #plt.show()
-                return None,None,-1,'crash'
+                return None,None,-1,None,'crash'
     @property
     def sigma_c(self):
         return self.sigma_c

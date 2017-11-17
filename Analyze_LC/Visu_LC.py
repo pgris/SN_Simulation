@@ -154,7 +154,7 @@ class Visu_LC:
                 flux = data[flux_name][mask]
                 fluxerr = data['fluxerr'][mask]/data['flux'][mask]*data[flux_name][mask]
                 ax.errorbar(time - toff, flux, fluxerr, ls='None',
-                            color=bandcolor, marker='.', markersize=3.)    
+                            color=bandcolor, marker='.', markersize=10.)    
             # Band name in corner
             ax.text(bandname_coords[0], bandname_coords[1], band,
                     color='k', ha=bandname_ha, va='top', transform=ax.transAxes)

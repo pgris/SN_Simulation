@@ -10,7 +10,7 @@ fieldid=744
 season=0
 X1=-999.
 Color=-999.
-dirmeas='../Light_Curves/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
+dirmeas='../../Light_Curves_snsim/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
 
 #thefile='Prod_LC/DD_Obs/290/Season_0/DD_290_0.26_0.3_X1_0.0_C_0.0_0.pkl'
 
@@ -20,7 +20,7 @@ dirmeas='../Light_Curves/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
 
 files = glob.glob(dirmeas+'/'+fieldname+'_'+str(fieldid)+'*_X1_'+str(X1)+'_C_'+str(Color)+'*.pkl')
 
-files=[dirmeas+'/DD_744_0.1_X1_-999.0_C_-999.0_200_202.pkl']
+files=[dirmeas+'/DD_744_0.1_X1_-999.0_C_-999.0_0_10.pkl']
 
 metadata=None
 r=[]
@@ -43,7 +43,15 @@ for fi in files:
     
 metadata=np.rec.fromrecords(r,names=names)
 
-print 'hello',len(metadata)
+print 'hello',len(metadata),set(metadata['DayMax'])
+idx = metadata['DayMax']==metadata['DayMax'][0]
+print len(metadata[idx])
+
+idx = metadata['DayMax']==metadata['DayMax'][1]
+print len(metadata[idx])
+
+
+
 figb, axb = plt.subplots(ncols=2, nrows=2, figsize=(10,9))
 
 axb[0][0].hist(metadata['DayMax'])

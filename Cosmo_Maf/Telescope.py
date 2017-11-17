@@ -25,6 +25,8 @@ class Telescope(object):
         self.expTime=dict(zip(self.filters,[30 for i in range(len(self.filters))]))
         self.photParams = PhotometricParameters(nexp=visittime/15.)
        
+        self.Cte=3631.*np.pi*6.6*6.5*30/(100.*4*6.626)
+
         #self.photParams = PhotometricParameters()
 
         params=['mag_sky','m5','FWHMeff','Tb','Sigmab','zp','counts_zp','Skyb','flux_sky']
@@ -50,13 +52,12 @@ class Telescope(object):
        
 
         self.throughputs=Throughputs(atmos=self.atmos,aerosol=self.aerosol)
-        if self.atmos:
-            self.throughputs.Load_Atmosphere(self.airmass)
+        self.throughputs.Load_Atmosphere(self.airmass)
+
 
         self.Inputs()
         self.Sky()
-        if self.atmos:
-            self.ZP()
+        self.ZP()
         
         
     @property
@@ -94,8 +95,7 @@ class Telescope(object):
         
         for filtre in self.filters:    
             myup=self.throughputs.darksky.calcInteg(self.throughputs.system[filtre])
-            if self.atmos:
-                self.data['Tb'][filtre]=self.Calc_Integ(self.throughputs.atmosphere[filtre])
+            self.data['Tb'][filtre]=self.Calc_Integ(self.throughputs.atmosphere[filtre])
             self.data['Sigmab'][filtre]=self.Calc_Integ(self.throughputs.system[filtre])
             self.data['mag_sky'][filtre]=-2.5*np.log10(myup/(3631.*self.Sigmab[filtre]))
 
@@ -108,8 +108,7 @@ class Telescope(object):
 
         filtre_trans=self.throughputs.system[filtre]
         wavelen_min, wavelen_max, wavelen_step=filtre_trans.getWavelenLimits(None,None,None)
-        
-            
+                    
         bandpass=Bandpass(wavelen=filtre_trans.wavelen, sb=filtre_trans.sb)
 
         flatSedb = Sed()
@@ -130,10 +129,12 @@ class Telescope(object):
         
         for filtre in self.filters:
             self.ZP_filtre(filtre)
+        print 'zeropoints',self.data['zp'],self.data['counts_zp']
+        #self.data['zp']=dict(zip(['u','g','r','i','z','y'],[27.03,28.53,28.27,27.91,27.49,26.78]))
 
     def ZP_filtre(self,filtre):
 
-        self.data['Skyb'][filtre]=5455*np.power(self.Diameter/6.5,2.)*np.power(self.DeltaT/30.,2.)*np.power(self.platescale,2.)*np.power(10.,0.4*(25.-self.mag_sky[filtre]))*self.Sigmab[filtre]
+        self.data['Skyb'][filtre]=self.Cte*np.power(self.Diameter/6.5,2.)*np.power(self.DeltaT/30.,2.)*np.power(self.platescale,2.)*np.power(10.,0.4*(25.-self.mag_sky[filtre]))*self.Sigmab[filtre]
             
         Zb=181.8*np.power(self.Diameter/6.5,2.)*self.Tb[filtre]
         mbZ=25.+2.5*np.log10(Zb) 
@@ -163,6 +164,7 @@ class Telescope(object):
     def flux_to_mag(self, flux, band, zp=None):
         if zp is None:
             zp = self.zero_points(band)
+        #print 'zp',zp,band
         m = -2.5 * np.log10(flux) + zp
         return m
 

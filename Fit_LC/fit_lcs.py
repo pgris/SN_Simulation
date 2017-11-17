@@ -17,6 +17,7 @@ parser.add_option("-s", "--season", type="int", default=-1, help="filter [%defau
 parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
 parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
 parser.add_option("-t", "--sntype", type="string", default='Ia', help="filter [%default]")
+parser.add_option("--dirout", type="string", default='Fitted_Light_Curves', help="filter [%default]")
 
 opts, args = parser.parse_args()
 
@@ -35,8 +36,10 @@ dir_in='../'+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
 filename=fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)
 filename+='_'+str(T0min)+'_'+str(T0max)+'.pkl'
 thefile=dir_in+'/'+filename
+dirout=opts.dirout
 
-dir_out=dir_in.replace(dirmeas,'Fitted_Light_Curves')
+dir_out=dir_in.replace(dirmeas,dirout)
+
 print dir_out
 
 if not os.path.isdir(dir_out) :
@@ -60,8 +63,9 @@ fit_stack=None
 #for lc in list_lc:
 for i in range(n_batch):
     result_queue = multiprocessing.Queue()
-    if (i%100) == 0:
+    if (i%10) == 0:
         print 'Fitting',i
+    time_begin=time.time()
     for j in range(0,n_multi):
         num=j+n_multi*i
         p=multiprocessing.Process(name='Subprocess-'+str(j),target=Fit_Single_LC,args=(list_lc[num],telescope,j,result_queue))
@@ -83,7 +87,7 @@ for i in range(n_batch):
         else:
             fit_stack=vstack([fit_stack,resultdict[j]])
     #break
-
+    print 'total elapse time',time.time()-time_begin
 """
 for fitval in fit_stack:
     print fitval['salt2.X1'],fitval['X1'],fitval['salt2.Color'],fitval['Color'],fitval['salt2.T0'],fitval['DayMax']

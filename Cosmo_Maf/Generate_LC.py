@@ -1,9 +1,9 @@
 from astropy.table import vstack,Table,Column
 import cPickle as pkl
-from astropy.io import ascii
+#from astropy.io import ascii
 import numpy as np
 #from Simul_Fit_SN import *
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import sncosmo
 from astropy import (cosmology, units as u, constants as const)
 from astropy.cosmology import FlatLambdaCDM
@@ -18,19 +18,14 @@ import os
 from scipy import interpolate, integrate
 
 class Generate_LC:
-    def __init__(self,parameters,fit=False,model='salt2-extended',version='1.0',telescope=None,ra=6.0979440,dec=-1.1051600):
+    def __init__(self,parameters,fit=False,model='salt2-extended',version='1.0',telescope=None,ra=6.0979440,dec=-1.1051600,airmass=1.2):
+
+        #time_begin=time.time()
 
         self.lc=[]
         self.m5={'u':23.61,'g':24.83,'r':24.35,'i':23.88,'z':23.30,'y':22.43}
         self.radeg=np.rad2deg(ra)
         self.decdeg=np.rad2deg(dec)
-
-        #self.params=Table(names=('t0','c','x1','z','ra','dec','status','fit','sn_type','sn_model','sn_version','mbsim','x0','dL'),dtype=('f8','f8','f8','f8','f8','S8','S8','f8','S8','S8','S8','f8','f8','f8'))
-       
-        #self.table_for_fit = Table(names=('time','flux','fluxerr','band','zp','zpsys'), dtype=('f8', 'f8','f8','S7','f4','S4'))
-        #self.table_obs = Table(names=('time','flux','fluxerr','band','zp','zpsys','airmass','m5','expTime','z','T0','x1','c','X0','mbsim','flux_e_sec','flux_5sigma_e_sec'), dtype=('f8', 'f8','f8','S7','f4','S4','f8', 'f8','f8','f8', 'f8','f8','f8','f8','f8','f8','f8'))
-        
-        #self.table_obs = Table(names=('time','flux','fluxerr','band','zp','zpsys','airmass','m5','expTime','flux_e_sec','flux_5sigma_e_sec'), dtype=('f8', 'f8','f8','S7','f4','S4','f8', 'f8','f8','f8', 'f8'))
 
         self.model=model
         self.version=version
@@ -62,6 +57,8 @@ class Generate_LC:
         #self.transmission=Throughputs(through_dir='FAKE_THROUGH',atmos_dir='FAKE_THROUGH',atmos=False,aerosol=False)
         
         self.transmission=telescope.throughputs
+        #self.transmission.Load_Atmosphere(airmass)
+        #print 'total elapse time init a',time.time()-time_begin
         self.telescope=telescope
 
         """
@@ -76,7 +73,7 @@ class Generate_LC:
         if self.airmass > 0:
             self.transmission.Load_Atmosphere(airmass)
         """
-        self.lc={}
+        #self.lc={}
         #print 'there we go',parameters,len(parameters),parameters.dtype
 
         self.param=parameters
@@ -97,15 +94,17 @@ class Generate_LC:
         beta=3.
         X0 *= np.power(10., 0.4*(alpha*self.param['X1'] -beta*self.param['Color']))
         #print 'llla',X0,alpha,beta,param['X1'],param['Color'],param['z'],lumidist
-        self.X0=X0
+        #self.X0=X0
         #print 'hello x0',X0,lumidist
         #SN=sncosmo.Model(source=source)
         self.SN.set(z=self.param['z'])
         self.SN.set(t0=self.param['DayMax'])
         self.SN.set(c=self.param['Color'])
         self.SN.set(x1=self.param['X1'])
-        self.SN.set(x0=self.X0)
-            
+        self.SN.set(x0=X0)
+        self.X0=X0
+        #print 'total elapse time init b',time.time()-time_begin
+
         #self.SED={}
         #print 'sncosmo parameters',self.SN.param_names,self.SN.parameters
         lsstmwebv = EBVbase()
@@ -123,6 +122,7 @@ class Generate_LC:
         #self.metadata=np.rec.fromrecords([(self.X0,self.param['X1'],self.param['Color'],self.param['DayMax'],self.param['z'],self.mbsim)], names = ['X0','X1','Color','DayMax','z','mbsim'])
         
         #self.metadata=Table(rows=[(self.X0,self.param['X1'],self.param['Color'],self.param['DayMax'],self.param['z'],self.mbsim)], names=('X0','X1','Color','DayMax','z','mbsim'), meta={'name': 'metadata'},dtype=tuple(['f8']*6))
+        #print 'total elapse time init',time.time()-time_begin
 
     def __call__(self,mjds,airmass,m5,filtre,expTime,out_q=None):
 
@@ -135,23 +135,7 @@ class Generate_LC:
         wavelength=np.repeat(wavelength[np.newaxis,:], len(fluxes), 0)
         SED_time = Sed(wavelen=wavelength, flambda=fluxes)
         #print 'total elapse time seds',time.time()-time_begin
-        r=[]
-        #visittime=expTime
-        """
-        if self.airmass > 0.:
-            trans=self.transmission.atmosphere[filtre]
-        else:
-            trans=self.transmission.system[filtre]
-        """
-                
-        #photParams = PhotometricParameters(nexp=visittime/15.)
-        itemindex = np.where(mjds==0.)
 
-        #print 'hello',itemindex,mjds[itemindex]
-
-
-       
-        #photParams=[]
         """
         time_begin=time.time()
         for i in range(len(SED_time.wavelen)):
@@ -207,7 +191,7 @@ class Generate_LC:
             transes.append(trans)
             #seds.append(sed)
         """
-        self.transmission.Load_Atmosphere(np.median(airmass))
+        
         transes=[self.transmission.atmosphere[filtre[i][-1]] for i in range(len(SED_time.wavelen))]
         #print 'total elapse time sed',time.time()-time_begin,len(transes)    
         fluxes=[seds[i].calcFlux(bandpass=transes[i]) for i in range(len(SED_time.wavelen))]
@@ -215,6 +199,7 @@ class Generate_LC:
         #print 'before',len(fluxes),len(seds),len(transes),len(m5),len(expTime),len(mjds),self.param['X1'],self.param['Color']
         #print fluxes,mjds
         #time_begin=time.time()
+
         fluxes=np.array(fluxes)
         idx=fluxes > 0.
         fluxes=fluxes[idx]
@@ -242,47 +227,27 @@ class Generate_LC:
         e_per_sec = [seds[i].calcADU(bandpass=transes[i], photParams=photParams[i]) for i in range(len(transes))] #number of ADU counts for expTime
         
         e_per_sec=[e_per_sec[i]/(expTime[i]/photParams[i].gain) for i in range(len(e_per_sec))]
-        
+        #mags_new=[self.telescope.flux_to_mag(e_per_sec[i],filtre[i][-1])[0] for i in range(len(e_per_sec))]
 
-        #gamma = np.asarray([SignalToNoise.calcGamma(transes[i],m5[i],photParams[i]) for i in range(len(mags))])
-        #x=np.power(10.,0.4*(mags-m5))
-        #err=(0.04-gamma)*x+gamma*(x**2)
-        #print np.sqrt(err)*fluxes,err_fluxes,fluxes
-        #print mags,self.telescope.mag_to_flux(mags,filtre)
+        #print 10**(-0.4*(mags-mags_new))
+
         table_obs=Table()
         table_obs.add_column(Column(mjds, name='time'))
         table_obs.add_column(Column(fluxes, name='flux'))
         table_obs.add_column(Column(err_fluxes, name='fluxerr'))
-        #table_obs.add_column(Column(err_fluxes/err_fluxes_orig, name='test'))
-        #table_obs.add_column(Column(['LSST::'+filtre]*len(mjds), name='band'))
-        table_obs.add_column(Column(filtre, name='band'))
+        table_obs.add_column(Column(['LSST::'+filtre[i][-1] for i in range(len(filtre))], name='band'))
         table_obs.add_column(Column([2.5*np.log10(3631)]*len(mjds),name='zp'))
         table_obs.add_column(Column(['ab']*len(mjds),name='zpsys'))
         table_obs.add_column(Column(airmass,name='airmass'))
         table_obs.add_column(Column(m5,name='m5'))
         table_obs.add_column(Column(expTime,name='expTime'))
         table_obs.add_column(Column(e_per_sec,name='flux_e_sec'))
-        #table_obs.add_column(Column(self.telescope.mag_to_flux(m5,filtre),name='flux_5sigma_e_sec'))
-        #print 'total elapse time table',time.time()-time_begin
+        table_obs.add_column(Column(self.telescope.mag_to_flux(m5,[filtre[i][-1] for i in range(len(filtre))]),'flux_5sigma_e_sec'))
         #print 'total elapse time GEN LC b',time.time()-time_begin
-        #print 'volila',t
-
-        #Table(names=('time','flux','fluxerr','band','zp','zpsys','airmass','m5','expTime','flux_e_sec','flux_5sigma_e_sec')
-        #print 'hello',r
-        #self.lc[filtre]=np.rec.fromrecords(r, names = ['flux','mjd','flux_SN'])
-
-        #print 'yyyy',len(self.lc[filtre]),self.lc[filtre]['flux_SN']
-        #select=self.table_obs[np.where(np.logical_and(self.table_obs['flux']/self.table_obs['fluxerr']>5.,self.table_obs['flux']>0.))]
-
-        if len(r)> 0:
-            res=np.rec.fromrecords(r, names = ['flux','mjd','flux_SN'])
-        else:
-            res=None
-        #out_q.put({filtre :(res,self.table_for_fit)})
-        
-        #out_q.put({filtre :(res,table_obs)})
+        #print table_obs
         if out_q is not None:
-            out_q.put({filtre : table_obs})  
+            out_q.put({filtre[0][-1] : table_obs}) 
+ 
         return table_obs
         #plt.show()
         

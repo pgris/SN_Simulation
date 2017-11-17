@@ -472,6 +472,7 @@ def Plot_median(res,fieldids,fieldcolors):
         axb.plot(rasrec['iband'],rasrec['obstime_upper'],color=fieldcolors[fieldid],ls='--')
         axb.plot(rasrec['iband'],rasrec['obstime_lower'],color=fieldcolors[fieldid],ls='--')
 
+    
     #axa[0].set_ylabel('Median duration [day] ',{'fontsize': fontsize})
     axa.set_ylabel('Median season length [day] ',{'fontsize': fontsize})
     axa.legend(loc='best',prop={'size':fontsize},frameon=False)
@@ -487,7 +488,8 @@ def Plot_median(res,fieldids,fieldcolors):
     axb.set_xlim([-0.1,4.1])
     axb.set_xticks([i for i in range(len(bands))])
     axb.set_xticklabels([corresp_inverted[i] for i in range(len(bands))])
-
+    figa.savefig('Obs_Plots/season_length_'+fieldname+'_'+str(fieldid)+'.png')
+    figb.savefig('Obs_Plots/exptime_'+fieldname+'_'+str(fieldid)+'.png')
 
     for band in 'grizy':
         figc, axc = plt.subplots(ncols=1, nrows=1, figsize=(10,9))
@@ -621,7 +623,7 @@ def Plot_Obs_per_filter(data=None, fieldname='',fieldid=0,season=0, flux_name='m
             time = data['mjd'][mask]
             flux = data[flux_name][mask]
             ax.errorbar(time, flux, ls='None',
-                        color=bandcolor, marker='.', markersize=3.)    
+                        color=bandcolor, marker='.', markersize=10.)    
             # Band name in corner
             ax.text(bandname_coords[0], bandname_coords[1], band,
                     color='k', ha=bandname_ha, va='top', transform=ax.transAxes)
@@ -645,7 +647,7 @@ def Plot_Obs_per_filter(data=None, fieldname='',fieldid=0,season=0, flux_name='m
                 if flux_name == 'm5sigmadepth':
                     ax.set_ylabel('$m_{5\sigma}$ [mag]')
 
-
+    plt.gcf().savefig('Obs_Plots/m5_vs_filter_'+fieldname+'_'+str(fieldid)+'_season_'+str(season)+'.png')
 
 
 
@@ -673,9 +675,10 @@ for fieldid in fieldids:
     name='Observations_'+fieldname+'_'+str(fieldid)+'.txt'
     myobs[fieldid]=Observations(fieldid=fieldid, filename=thedir+'/'+name)
     
-Plot_Observations(myobs[744],'DD',744)
+#Plot_Observations(myobs[744],'DD',744)
 
-plt.show()
+#plt.show()
+
 r=[]
 bands='grizy'
 corresp=dict(zip(bands+'a',[i for i in range(len(bands)+1)]))

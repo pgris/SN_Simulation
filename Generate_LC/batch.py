@@ -4,8 +4,9 @@ import os
 import time
 
 parser = OptionParser()
-parser.add_option("-z", "--z", type="float", default=0.0, help="filter [%default]")
-#parser.add_option("-Z", "--zmax", type="float", default=1.2, help="filter [%default]")
+parser.add_option("--zmin", type="float", default=0.0, help="filter [%default]")
+parser.add_option("--zmax", type="float", default=1.2, help="filter [%default]")
+parser.add_option("--zstep", type="float", default=0.1, help="filter [%default]")
 #parser.add_option("-N", "--nevts", type="int", default=10, help="filter [%default]")
 parser.add_option("-m", "--model", type="string", default='salt2-extended', help="filter [%default]")
 parser.add_option("-v", "--version", type="string", default='', help="filter [%default]")
@@ -21,11 +22,13 @@ parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter
 #parser.add_option("--zrandom", type="string", default="yes", help="filter [%default]")
 parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
 parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
+parser.add_option("--dirout", type="string", default="Light_Curves_sncosmo", help="filter [%default]")
 
 opts, args = parser.parse_args()
 
-z=opts.z
-#zmax=opts.zmax
+zmin=opts.zmin
+zmax=opts.zmax
+zstep=opts.zstep
 #nevts=opts.nevts
 fieldname=opts.fieldname
 fieldid=opts.fieldid
@@ -38,8 +41,7 @@ dirmeas=opts.dirmeas
 #zrandom=opts.zrandom
 T0min=opts.T0min
 T0max=opts.T0max
-
-cmd='python generate_lc.py --z '+str(z)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --T0min '+str(T0min)+' --T0max '+str(T0max)
+dirout=opts.dirout
 
 cwd = os.getcwd()
 dirScript= cwd + "/scripts"
@@ -51,7 +53,7 @@ dirLog = cwd + "/logs"
 if not os.path.isdir(dirLog) :
     os.makedirs(dirLog)    
     
-name_id=fieldname+'_'+str(fieldid)+'_'+str(z)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)
+name_id=fieldname+'_'+str(fieldid)+'_'+str(zmin)+'_'+str(zmax)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)
 log = dirLog + '/'+name_id+'.log'
 
 
@@ -65,7 +67,9 @@ script.write(" cd " + cwd + "\n")
 script.write("bash " + "\n")
             #script.write("ls /usr/local/grid/emi-3/WN/SL6_64/3.10.0-1.2/usr/lib64/" + "\n")
 script.write(" source setups_cosmomaf.sh\n")
-script.write(cmd+" \n")
+for z in np.arange(zmin,zmax+zstep,zstep):
+    cmd='python generate_lc.py --z '+str(z)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --T0min '+str(T0min)+' --T0max '+str(T0max)+' --dirout '+dirout
+    script.write(cmd+" \n")
 script.write("EOF" + "\n")
 script.close()
 os.system("sh "+scriptName)

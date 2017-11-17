@@ -15,7 +15,8 @@ parser.add_option("-t", "--sntype", type="string", default='Ia', help="filter [%
 parser.add_option("-x", "--stretch", type="float", default=2.0, help="filter [%default]")
 parser.add_option("-c", "--color", type="float", default=-0.2, help="filter [%default]")
 parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter [%default]")
-#parser.add_option("-r", "--T0random", type="string", default="No", help="filter [%default]")
+parser.add_option("--NT0", type="int", default=50, help="filter [%default]")
+parser.add_option("--dirout", type="string", default="None", help="filter [%default]")
 
 opts, args = parser.parse_args()
 
@@ -29,6 +30,9 @@ sntype=opts.sntype
 stretch=opts.stretch
 color=opts.color
 dirmeas=opts.dirmeas
+N_T0=opts.NT0
+dirout=opts.dirout
+
 #T0random=opts.T0random
 
 OpSim_Logs_dir=os.getenv('OPSIM_LOGS')
@@ -38,7 +42,7 @@ myobs=Observations(fieldid=fieldid, filename=filename)
 
 myseason=myobs.seasons[season]
 
-print myseason.dtype,np.min(myseason['mjd']),np.max(myseason['mjd'])
+#print myseason.dtype,np.min(myseason['mjd']),np.max(myseason['mjd'])
 
 iddx=myseason['band']!='LSSTPG::u'
 mysel=myseason[iddx]
@@ -46,17 +50,17 @@ mysel=myseason[iddx]
 min_season=np.min(mysel['mjd'])
 max_season=np.max(mysel['mjd'])
 
-T0_vals=np.arange(min_season,max_season,0.1)
-N_T0=100
+T0_vals=np.arange(min_season,max_season,0.2)
+if N_T0==-1:
+    N_T0=len(T0_vals)
+
 T0min=0
 T0max=T0min+N_T0
-
-for z in np.arange(zmin,zmax+zstep,zstep):
-    while T0min < len(T0_vals):
-        if T0max > len(T0_vals):
-            T0max = len(T0_vals)-1
-        cmd='python batch.py --z '+str(z)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --T0min '+str(T0min)+' --T0max '+str(T0max)
-        print 'executing',cmd
-        os.system(cmd)
-        T0min+=N_T0
-        T0max=T0min+N_T0
+while T0min < len(T0_vals):
+    if T0max > len(T0_vals):
+        T0max = len(T0_vals)-1
+    cmd='python batch.py --zmin '+str(zmin)+' --zmax '+str(zmax)+' --zstep '+str(zstep)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --T0min '+str(T0min)+' --T0max '+str(T0max)+' --dirout '+dirout
+    print 'executing',cmd
+    os.system(cmd)
+    T0min+=N_T0
+    T0max=T0min+N_T0

@@ -52,7 +52,8 @@ class Fit_Single_LC:
                     self.outdict['fit_status']='unknow'
                     self.Fit_LC(lc_sel)
                     #print self.outdict.keys()
-                    self.Get_Quality_LC(lc_sel,self.outdict['sncosmo_fitted']['t0'],lc.meta['z'])
+                    if self.outdict['fit_status'] != 'crashd':
+                        self.Get_Quality_LC(lc_sel,self.outdict['sncosmo_fitted']['t0'],lc.meta['z'])
                 else:
                     self.outdict['status']='no_obs'
                     self.outdict['fit_status']='unknow'
