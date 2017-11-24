@@ -18,6 +18,7 @@ class Fit_Single_LC:
         self.z=lc.meta['z'][0]
         """
 
+        #print 'alors',len(lc)
         for band in self.bands_rest:
             self.dict_quality['N_bef_'+band]=0.
             self.dict_quality['N_aft_'+band]=0.
@@ -55,8 +56,11 @@ class Fit_Single_LC:
                     if self.outdict['fit_status'] != 'crashd':
                         self.Get_Quality_LC(lc_sel,self.outdict['sncosmo_fitted']['t0'],lc.meta['z'])
                 else:
-                    self.outdict['status']='no_obs'
+                    self.outdict['status']='no_qua'
                     self.outdict['fit_status']='unknow'
+            else:
+                self.outdict['status']='no_obs'
+                self.outdict['fit_status']='unknow'
         else:
             self.outdict['status']='no_pha'
             self.outdict['fit_status']='unknow' 

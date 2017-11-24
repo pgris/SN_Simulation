@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from lsst.sims.photUtils import Bandpass
 from lsst.sims.photUtils import Sed
 import numpy as np
+from astropy.table import Table
 
 class Throughputs(object):
     def __init__(self,through_dir='LSST_THROUGHPUTS_BASELINE',atmos_dir='THROUGHPUTS_DIR',atmos=True,aerosol=True,telescope_files=['detector.dat', 'lens1.dat', 'lens2.dat', 'lens3.dat', 'm1.dat', 'm2.dat', 'm3.dat'],filter_files=['filter_'+f+'.dat' for f in 'ugrizy'],filterlist=('u', 'g', 'r', 'i', 'z', 'y'),wave_min=300.,wave_max=1150.):
@@ -25,6 +26,7 @@ class Throughputs(object):
 
         self.lsst_std = {}
         self.lsst_system = {}
+        self.mean_wavelength={}
         self.lsst_detector = {}
         self.lsst_atmos={}
         self.lsst_atmos_aerosol={}
@@ -32,10 +34,14 @@ class Throughputs(object):
         self.aerosol=aerosol
         self.Load_System()
         self.Load_DarkSky()
+        
         if atmos:
             self.Load_Atmosphere()
         self.lsst_telescope={}
+        
         self.Load_Telescope()
+        
+        self.Mean_Wave()
 
 
     @property
@@ -52,7 +58,10 @@ class Throughputs(object):
 
     def aerosol(self):
         return self.lsst_atmos_aerosol
-
+    """
+    def mean_wavelength(self,band):
+        return np.mean(self.lsst_system[band].wavelen)
+    """
     def Load_System(self):
         
         for f in self.filterlist:
@@ -63,6 +72,8 @@ class Throughputs(object):
             #print 'hello',f,index,self.throughputsDir,self.filter_files[index[0]]
             self.lsst_system[f].readThroughputList(self.telescope_files+[self.filter_files[index[0]]], 
                                                    rootDir=self.throughputsDir,wavelen_min=self.wave_min,wavelen_max=self.wave_max)
+
+            
 
         #print 'loaded from',self.throughputsDir
 
@@ -94,6 +105,7 @@ class Throughputs(object):
             for f in self.filterlist:
                 wavelen, sb = self.lsst_system[f].multiplyThroughputs(atmosphere.wavelen, atmosphere.sb)
                 self.lsst_atmos[f]= Bandpass(wavelen=wavelen, sb=sb)
+                
 
             if self.aerosol:
                 atmosphere_aero = Bandpass()
@@ -107,6 +119,7 @@ class Throughputs(object):
           for f in self.filterlist:  
               self.lsst_atmos[f]= self.lsst_system[f]
               self.lsst_atmos_aerosol[f]=self.lsst_system[f]
+             
 
     def Plot_Throughputs(self):
 
@@ -173,3 +186,20 @@ class Throughputs(object):
 
         ax1.set_xlim([300,1150])
         #plt.show()
+ 
+
+    def Mean_Wave(self):
+
+        """
+        thedir='../Cosmo_Maf/Instruments/Landolt/'
+        names=dict(zip(['B','I','R','U','V'],['sb_-41A.dat','si_-25A.dat','sr_-21A.dat','sux_modified.dat','sv_-27A.dat']))
+        for band in 'BRIUV':
+            t = Table.read(thedir+names[band],format='ascii')
+            print band,np.min(t['col1']),np.max(t['col1']),np.mean(np.max(t['col1'])-np.min(t['col1']))
+        """
+        if 'g' in self.filterlist:
+            for band in self.filterlist:
+                self.mean_wavelength[band]=np.sum(self.lsst_atmos[band].wavelen*self.lsst_atmos[band].sb)/np.sum(self.lsst_atmos[band].sb)
+        else:
+            for band in self.filterlist:
+                self.mean_wavelength[band]=0. 

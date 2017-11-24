@@ -30,6 +30,7 @@ parser.add_option("--max_rf_phase", type="float", default=30., help="filter [%de
 parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
 parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
 parser.add_option("--dirout", type="string", default="Light_Curves_sncosmo", help="filter [%default]")
+parser.add_option("--multiproc", type="string", default="no", help="filter [%default]")
 #parser.add_option("-r", "--rolling", type="int", default=0, help="filter [%default]")
 #parser.add_option("--nrolling", type="int", default=0, help="filter [%default]")
 #parser.add_option("--merge_factor", type="int", default=0, help="filter [%default]")
@@ -52,6 +53,7 @@ max_rf_phase=opts.max_rf_phase
 T0min=opts.T0min
 T0max=opts.T0max
 dirout=opts.dirout
+multiproc=opts.multiproc
 
 OpSim_Logs_dir=os.getenv('OPSIM_LOGS')
 filename=OpSim_Logs_dir+'/'+opts.dirmeas+'/Observations_'+opts.fieldname+'_'+str(fieldid)+'.txt'
@@ -89,6 +91,10 @@ print myseason.dtype,np.min(myseason['mjd']),np.max(myseason['mjd'])
 iddx=myseason['band']!='LSSTPG::u'
 mysel=myseason[iddx]
 
+#remove some of the obs points depending on the redshift
+
+
+
 min_season=np.min(mysel['mjd'])
 max_season=np.max(mysel['mjd'])
 
@@ -115,7 +121,7 @@ if Color ==-999 and X1!= -999.:
 if Color !=-999 and X1!= -999.:
     n_multi=1
     tab_X1_c = np.rec.fromrecords([(X1,1.,Color,1.,'')],names=['X1','X1_weight','Color','Color_weight','type'])
-    print 'aah',tab_X1_c
+    #print 'aah',tab_X1_c
 
 #n_batch=N_sn/n_multi
 
@@ -143,35 +149,35 @@ name_for_output=opts.fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(X1)+'_C_'+
 
 for T0 in T0_vals[T0min:T0max]:
     
-    ival=0
-    n_multi_l=n_multi
-    print 'processing',T0,T0min,T0max
-    for i in range(nbatch):
-        #time_beginb=time.time()
-        result_queue = multiprocessing.Queue()
-        if ival+n_multi_l > len(tab_X1_c):
-            n_multi_l=len(tab_X1_c)-ival-1
-        #print 'hello',n_multi_l
-        for j in range(0,n_multi_l):
-            """
-            X1_val=tab_X1_c['X1'][ival]
-            X1_weight=tab_X1_c['X1_weight'][ival]
-            Color_val=tab_X1_c['Color'][ival]
-            Color_weight=tab_X1_c['Color_weight'][ival]
-            """
-            #print 'There man',T0,X1_val,Color_val,i
-            p=multiprocessing.Process(name='Subprocess-'+str(j),target=Generate_Single_LC,args=(z,T0,tab_X1_c['X1'][ival],tab_X1_c['X1_weight'][ival],tab_X1_c['Color'][ival],tab_X1_c['Color_weight'][ival],myseason,telescope,j,min_rf_phase,max_rf_phase,duration,date_obs,result_queue))
-            p.start()
-            ival+=1
-        resultdict = {}
-        for j in range(0,n_multi_l):
-            resultdict.update(result_queue.get())
-
-        for p in multiprocessing.active_children():
-            p.join()
+    if multiproc == 'yes':
+        ival=0
+        n_multi_l=n_multi
+        print 'processing',T0,T0min,T0max
+        for i in range(nbatch):
+       
+            result_queue = multiprocessing.Queue()
+            if ival+n_multi_l > len(tab_X1_c):
+                n_multi_l=len(tab_X1_c)-ival
         
-        for j in range(0,n_multi_l):
-            lcs.append(resultdict[j])
+            for j in range(0,n_multi_l):
+                p=multiprocessing.Process(name='Subprocess-'+str(j),target=Generate_Single_LC,args=(z,T0,tab_X1_c['X1'][ival],tab_X1_c['X1_weight'][ival],tab_X1_c['Color'][ival],tab_X1_c['Color_weight'][ival],myseason,telescope,j,min_rf_phase,max_rf_phase,duration,date_obs,multiproc,result_queue))
+                p.start()
+                ival+=1
+            resultdict = {}
+            for j in range(0,n_multi_l):
+                resultdict.update(result_queue.get())
+                
+            for p in multiprocessing.active_children():
+                p.join()
+                
+            for j in range(0,n_multi_l):
+                lcs.append(resultdict[j])
+
+    else:
+        for ival in range(len(tab_X1_c)):
+            lcs.append(Generate_Single_LC(z,T0,tab_X1_c['X1'][ival],tab_X1_c['X1_weight'][ival],tab_X1_c['Color'][ival],tab_X1_c['Color_weight'][ival],myseason,telescope,0,min_rf_phase,max_rf_phase,duration,date_obs,multiproc).get_lc())
+
+
         #print 'total elapse time',time.time()-time_beginb   
       
     #lcs+=[Generate_Single_LC(z,T0,tab_X1_c['X1'][i],tab_X1_c['X1_weight'][i],tab_X1_c['Color'][i],tab_X1_c['Color_weight'][i],myseason,telescope,0,min_rf_phase,max_rf_phase,duration,date_obs).lc for i in range(len(tab_X1_c))]

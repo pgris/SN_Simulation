@@ -32,11 +32,18 @@ T0max=opts.T0max
 
 
 zstep=0.01
+nz=2
 
-for i in range(0,10):
-    zmin=0.1*float(i)+zstep
-    zmax=0.1*float(i+1)
+for j in range(10):
+    T0min=j*100
+    T0max=T0min+100
+
+    for i in range(0,50):
+        zmin=0.01+0.01*float(i*nz)
+        zmax=zmin+nz*zstep
     #cmd='python multiple_batch.py --zmin '+str(zmin)+' --zmax '+str(zmax)+' --zstep '+str(zstep)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --NT0 '+str(NT0)+' --dirout '+dirout
-    cmd='python batch.py --zmin '+str(zmin)+' --zmax '+str(zmax)+' --zstep '+str(zstep)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --dirout '+dirout +' --T0min '+str(T0min)+' --T0max '+str(T0max)
-    print cmd
-    os.system(cmd)
+        cmd='python batch.py --zmin '+str(zmin)+' --zmax '+str(zmax)+' --zstep '+str(zstep)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --dirout '+dirout +' --T0min '+str(T0min)+' --T0max '+str(T0max)
+        print cmd
+        os.system(cmd)
+
+    #break

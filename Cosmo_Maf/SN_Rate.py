@@ -28,15 +28,16 @@ class SN_Rate:
             print thebins
             thebins=np.append(thebins,thebins[len(bins)-1]+(bins[1]-bins[0]))
 
-        rate, err_rate = self.sn_rate(zz)
+        rate, err_rate = self.sn_rate(thebins)
                 
         area = self.survey_area / STERADIAN2SQDEG # or area= self.survey_area/41253.
     
         dvol = norm*self.astropy_cosmo.comoving_volume(thebins).value
         #print 'after rate',len(zz),len(rate),len(dvol),area,rate
-        dvol = dvol[1:] - dvol[:-1]
-        #print 'dvol',dvol
 
+        #dvol = dvol[1:] - dvol[:-1]
+        
+        #print 'hello',len(zz),len(dvol)
         
         if account_for_edges:
             margin = (1.+zz) * (self.max_rf_phase-self.min_rf_phase) / 365.25
@@ -45,8 +46,12 @@ class SN_Rate:
         else:
             effective_duration = self.duration
 
-        nsn=rate * area * dvol * effective_duration / (1.+zz)
-        err_nsn=err_rate* area * dvol * effective_duration / (1.+zz)
+        nsn=rate * area * dvol * effective_duration / (1.+thebins)
+        err_nsn=err_rate* area * dvol * effective_duration / (1.+thebins)
+        nsn = nsn[1:] - nsn[:-1]
+        #err_nsn= np.sqrt(err_nsn[1:]**2 + err_nsn[:-1]**2)
+        #err_nsn= [np.sqrt(vala**2+valb**2) for vala,valb in zip(err_nsn[1:],err_nsn[:-1])]
+        err_nsn=np.sqrt(-err_nsn[:-1]**2+err_nsn[1:]**2)
         return zz,rate, err_rate,nsn, err_nsn
         
 
@@ -95,7 +100,15 @@ class SN_Rate:
         if self.rate == 'Dilday':
             return self.dilday_rate(z)
 
+    def N_SN(self, z):
 
+        rate, err_rate = self.sn_rate(z)
+                
+        area = self.survey_area / STERADIAN2SQDEG
+        vol=self.astropy_cosmo.comoving_volume(z).value
+        duration=self.duration
+        nsn=norm*rate*area*vol*duration/(1.+z)
+        err_nsn=err_rate*norm*area*vol*duration/(1.+z)
 
-
+        return nsn,err_nsn
         

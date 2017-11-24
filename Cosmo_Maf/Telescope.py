@@ -129,7 +129,7 @@ class Telescope(object):
         
         for filtre in self.filters:
             self.ZP_filtre(filtre)
-        print 'zeropoints',self.data['zp'],self.data['counts_zp']
+        #print 'zeropoints',self.data['zp'],self.data['counts_zp']
         #self.data['zp']=dict(zip(['u','g','r','i','z','y'],[27.03,28.53,28.27,27.91,27.49,26.78]))
 
     def ZP_filtre(self,filtre):

@@ -53,11 +53,11 @@ dirLog = cwd + "/logs"
 if not os.path.isdir(dirLog) :
     os.makedirs(dirLog)    
     
-name_id=fieldname+'_'+str(fieldid)+'_'+str(zmin)+'_'+str(zmax)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)
+name_id=fieldname+'_'+str(fieldid)+'_'+str(zmin)+'_'+str(zmax-zstep)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)
 log = dirLog + '/'+name_id+'.log'
 
 
-qsub = "qsub -P P_lsst -l sps=1,ct=03:00:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
+qsub = "qsub -P P_lsst -l sps=1,ct=03:00:00,h_vmem=16G -j y -o "+ log + " <<EOF"
 scriptName = dirScript+'/'+name_id+'.sh'
 
 script = open(scriptName,"w")
@@ -67,10 +67,11 @@ script.write(" cd " + cwd + "\n")
 script.write("bash " + "\n")
             #script.write("ls /usr/local/grid/emi-3/WN/SL6_64/3.10.0-1.2/usr/lib64/" + "\n")
 script.write(" source setups_cosmomaf.sh\n")
-for z in np.arange(zmin,zmax+zstep,zstep):
+#for z in np.arange(zmin,zmax-zstep,zstep):
+for z in np.linspace(zmin,zmax,num=2, endpoint=False):
     cmd='python generate_lc.py --z '+str(z)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --T0min '+str(T0min)+' --T0max '+str(T0max)+' --dirout '+dirout
     script.write(cmd+" \n")
 script.write("EOF" + "\n")
 script.close()
 os.system("sh "+scriptName)
-time.sleep(1)
+#time.sleep(1)
