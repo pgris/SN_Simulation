@@ -4,14 +4,15 @@ import matplotlib.pyplot as plt
 from astropy.table import vstack,Table,Column
 
 class Fit_Single_LC:
-    def __init__(self, lc,telescope,inum,output_q):
-        
+    def __init__(self, lc,telescope,inum,output_q=None):
+        #time_begin=time.time()
         self.lc=lc
         self.telescope=telescope
         #print lc.dtype
         self.bands_rest = 'grizy'
         self.dict_quality={}
         self.outdict={}
+        #self.snutils=snutils
         """
         print lc.meta
         self.T0=lc.meta['DayMax'].value
@@ -34,27 +35,30 @@ class Fit_Single_LC:
         self.dict_quality['cadence_all']=0.
         self.dict_quality['cadence_rms_all']=0.
         self.dict_quality['SNR_tot']=0.0
-
+        
         if self.lc is not None:
             idx = self.lc['flux']>0.
             lc_sel=self.lc[idx]
             idxa = lc_sel['flux']/lc_sel['fluxerr']>5.
             lc_sel=lc_sel[idxa]
             if len(lc_sel)>0.:
-                self.Get_Quality_LC(lc_sel,lc.meta['DayMax'],lc.meta['z'])
+                #self.Get_Quality_LC(lc_sel,lc.meta['DayMax'],lc.meta['z'])
+                #print 'total elapse time filling table',time.time()-time_begin
                 #print self.dict_quality
                 #self.Plot_LC(lc_sel)
         
         #print [val for key,val in self.dict_quality.items()]
         #print [key for key,val in self.dict_quality.items()]
-
-                if (self.dict_quality['N_bef_all']+self.dict_quality['N_aft_all']) >= 5:
+                idxb=(lc_sel['time'] > lc.meta['DayMax']-20)&(lc_sel['time'] <= lc.meta['DayMax']+40)
+                if len(lc_sel[idxb]) >= 5:
                     self.outdict['status']='go_fit'
                     self.outdict['fit_status']='unknow'
                     self.Fit_LC(lc_sel)
                     #print self.outdict.keys()
                     if self.outdict['fit_status'] != 'crashd':
                         self.Get_Quality_LC(lc_sel,self.outdict['sncosmo_fitted']['t0'],lc.meta['z'])
+                    else:
+                        self.Get_Quality_LC(lc_sel,lc.meta['DayMax'],lc.meta['z']) 
                 else:
                     self.outdict['status']='no_qua'
                     self.outdict['fit_status']='unknow'
@@ -76,63 +80,80 @@ class Fit_Single_LC:
         """
 
         #print self.Summary()
-        output_q.put({inum : self.Summary()})
+        if output_q is not None:
+            output_q.put({inum : self.Summary()})
 
     def Get_Quality_LC(self,lc, T0, z):
 
         #estimate the number of LC points (5 sigma) before and after T0 - observer frame
-       
+        #time_begin=time.time()
         lc.sort('time')
-        #print lc.dtype
-        n_bef_tot=0
-        n_aft_tot=0
         self.dict_quality['SNR_tot']=5.*np.power(np.sum(np.power(lc['flux_e_sec']/lc['flux_5sigma_e_sec'],2.)),0.5)
                 #print lc
-        n_bef_tot, n_aft_tot=self.Get_nums(lc,T0)
+        #print 'total elapse time filling table a',time.time()-time_begin
+        #time_beginc=time.time()
+        #calc=0
+        lc_bef,lc_aft=self.Bef_Aft(lc,T0)
         for band in self.bands_rest:
-            idx=lc['band']=='LSST::'+band
-            n_bef, n_aft=self.Get_nums(lc[idx],T0)                   
-            self.dict_quality['N_bef_'+band]=n_bef
-            self.dict_quality['N_aft_'+band]=n_aft
+            #time_beginb=time.time()
+            idx=lc['band']=='LSST::'+band                   
             
+            self.dict_quality['N_bef_'+band]=len(lc_bef[lc_bef['band']=='LSST::'+band])
+            self.dict_quality['N_aft_'+band]=len(lc_aft[lc_aft['band']=='LSST::'+band])
+            #print 'total elapse time filling table b1',time.time()-time_beginb
+
             if len(lc[idx])>=1:
+                
                 self.dict_quality['SNR_'+band]=5.*np.power(np.sum(np.power(lc['flux_e_sec'][idx]/lc['flux_5sigma_e_sec'][idx],2.)),0.5)
                 mean_cadence, rms_cadence=self.Get_cadence(lc[idx])
+                #mean_cadence, rms_cadence=0,0
                 self.dict_quality['cadence_'+band]=mean_cadence
                 self.dict_quality['cadence_rms_'+band]=rms_cadence
                 self.dict_quality['m5sigma_'+band]=np.mean(lc[idx]['m5'])
                 self.dict_quality['m5sigma_rms_'+band]=np.std(lc[idx]['m5'])
-
-        self.dict_quality['N_bef_all']=n_bef_tot 
-        self.dict_quality['N_aft_all']=n_aft_tot
-        mean_cadence, rms_cadence=self.Get_cadence(lc)
+            #calc+=time.time()-time_beginb
+            #print 'total elapse time filling table b',time.time()-time_beginb
+        #print 'total elapse time filling table c',time.time()-time_beginc
+        self.dict_quality['N_bef_all']=np.sum([self.dict_quality['N_bef_'+band] for band in self.bands_rest])
+        self.dict_quality['N_aft_all']=np.sum([self.dict_quality['N_aft_'+band] for band in self.bands_rest])
+        #mean_cadence, rms_cadence=self.Get_cadence(lc)
+        mean_cadence, rms_cadence=0,0
         self.dict_quality['cadence_all']=mean_cadence
         self.dict_quality['cadence_rms_all']=rms_cadence
         
         self.dict_quality['phase_first']=(lc[0]['time']-T0)/(1.+z)
-        self.dict_quality['phase_last']=(lc[len(lc)-1]['time']-T0)/(1.+z)
+        self.dict_quality['phase_last']=(lc[-1]['time']-T0)/(1.+z)
            
+        #print 'total elapse time filling table',time.time()-time_begin
 
     def Get_nums(self, lc, T0):
         
-        idxa=np.logical_and(lc['time'] <= T0,lc['time'] > T0-20)
-        idxb=np.logical_and(lc['time']> T0,lc['time'] <= T0+40)
+        #idxa=(lc['time'] <= T0)&(lc['time'] > T0-20)
+        #idxb=(lc['time']> T0)&(lc['time'] <= T0+40)
+        idx=(lc['time'] > T0-20)&(lc['time'] <= T0+40)
+        lc_sel=lc[idx]
+        idxa=lc_sel['time']<=T0
+        lc_bef=lc_sel[idxa]
+        ntot=len(lc_sel)
+        nbef=len(lc_bef)
 
-        return float(len(lc[idxa])),float(len(lc[idxb]))
+        return nbef,ntot-nbef
+
+    def Bef_Aft(self, lc, T0):
+        idxa=(lc['time'] <= T0)&(lc['time'] > T0-20)
+        idxb=(lc['time']> T0)&(lc['time'] <= T0+40)
+        return lc[idxa],lc[idxb]
 
     def Get_cadence(self, sel):
 
-        if len(sel) == 0:
+        if len(sel) == 0 or len(sel) == 1:
             return 0.0,0.0
         else:
-            if len(sel)==1:
-                return 0.0,0.0
+            calc=[io-jo for jo,io in zip(sel['time'][:-1], sel['time'][1:])]  
+            if len(calc)==1:
+                return calc[0],0.0
             else:
-                calc=[io-jo for jo,io in zip(sel['time'][:-1], sel['time'][1:])]  
-                if len(calc)==1:
-                    return calc[0],0.0
-                else:
-                    return np.mean(calc),np.std(calc)
+                return np.mean(calc),np.std(calc)
 
     def Plot_LC(self,lc):
         
@@ -159,7 +180,7 @@ class Fit_Single_LC:
         #self.outdict['m5sigma']=np.median(self.lc['m5'])
         self.outdict['airmass']=np.median(lc['airmass'])
                                           
-        res,fitted_model,mbfit,covar_mb,fit_status=myfit(lc)
+        res,fitted_model,mbfit,fit_status=myfit(lc)
 
         #print 'hello',res,fitted_model,mbfit,fit_status
         if fit_status == 'ok':
@@ -171,9 +192,10 @@ class Fit_Single_LC:
             for i,par in enumerate(fitted_model.param_names):
                 self.outdict['sncosmo_fitted'][par]=fitted_model.parameters[i]
                 #self.outdict['fitted_model']=fitted_model
+            """
             for key, val in covar_mb.items():
                 self.outdict['recalc'][key]=val
-        
+            """
             #print 'allo',covar_mb
             self.outdict['mbfit']=mbfit
             self.outdict['fit_status']='fit_ok'
@@ -183,7 +205,8 @@ class Fit_Single_LC:
 
 
     def Summary(self):
-        
+
+        #time_begin=time.time()
         resu=self.dict_quality
 
         #print 'yes',self.duration
@@ -195,17 +218,18 @@ class Fit_Single_LC:
         resu['salt2.X0']=-999.
         resu['salt2.X1']=-999.
         resu['salt2.Color']=-999.
+    
         resu['salt2.CovT0T0']=-999.
         resu['salt2.CovX1X1']=-999.
         resu['salt2.CovX0X0']=-999.
-        resu['salt2.Covmbmb']=-999.
+        #resu['salt2.Covmbmb']=-999.
         resu['salt2.CovColorColor']=-999.
         resu['salt2.CovX0X1']=-999.
         resu['salt2.CovColorX0']=-999.
         resu['salt2.CovColorX1']=-999.
-        resu['salt2.CovColormb']=-999.
-        resu['salt2.CovX1mb']=-999.
-
+        #resu['salt2.CovColormb']=-999.
+        #resu['salt2.CovX1mb']=-999.
+        
         resu['mbfit']=-999.
 
         if self.outdict['status']=='go_fit':
@@ -227,12 +251,13 @@ class Fit_Single_LC:
                     resu['salt2.CovColorX0']=self.outdict['sncosmo_res']['covariance'][corr['c']][corr['x0']]
                     resu['salt2.CovColorX1']=self.outdict['sncosmo_res']['covariance'][corr['c']][corr['x1']]
                     resu['salt2.CovT0T0']=self.outdict['sncosmo_res'].errors['t0']**2
+                    """
                     for val in ['salt2.Covmbmb','salt2.CovColormb','salt2.CovX1mb']:
                         resu[val]=self.outdict['recalc'][val]
-
+                    """
                 resu['mbfit']=self.outdict['mbfit']
                 #print 'ohohoho',resu['mbfit']-resu['mbsim']
-        
+        #print 'total elapse time filling table',time.time()-time_begin
         #print 'hello',resu.values(),resu.keys()
         #restab=np.rec.fromrecords(tuple([res for res in resu.values()]),names=[key for key in resu.keys()])
         """
@@ -245,17 +270,26 @@ class Fit_Single_LC:
         """
         #print 'test here'
         #t=Table(meta=self.lc.meta)
-        t=Table()
+        #time_begin=time.time()
+        #print [resu[key] for key in resu.keys()],tuple([key for key in resu.keys()])
+        t=Table([[resu[key]] for key in resu.keys()],names=tuple([key for key in resu.keys()]))
+        for key in self.lc.meta.keys():
+            t.add_column(Column([self.lc.meta[key]], name=key))
+        #print t.meta
         """
         print self.lc.meta.keys()
         pol=self.lc.meta['DayMax'].quantity
         print 'hhh',pol
         """
+        """
         for key in self.lc.meta.keys():
             #print key,self.lc.meta[key]
             t.add_column(Column([self.lc.meta[key]], name=key))
+        print 'total elapse time filling table',time.time()-time_begin
+        time_begin=time.time()
         for key,val in resu.items():
             t.add_column(Column([val], name=key))
-
+        """
+        #print 'total elapse time filling table',time.time()-time_begin
         #print t
         return t

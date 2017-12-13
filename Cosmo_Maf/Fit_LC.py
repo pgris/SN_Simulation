@@ -9,26 +9,28 @@ from Telescope import *
 from scipy import interpolate, integrate
 from lsst.sims.photUtils import PhotometricParameters
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline1d
-from SN_Utils import *
+import time
+from scipy.interpolate import griddata
 
 class Fit_LC:
     def __init__(self,model='salt2-extended',version='1.0',z=0.1,telescope=None,Plot=False,bands='ugrizy'):
 
         self.Plot=Plot
-        transmission=telescope.throughputs
+        #transmission=telescope.throughputs
         self.z=z
         #bands=[b[-1:] for b in np.unique(select['band'])]
         self.model=model
         self.version=version
 
         #print 'hello',bands,telescope.airmass
+        """
         for filtre in bands:
             if telescope.airmass > 0:
                 band=sncosmo.Bandpass(transmission.atmosphere[filtre].wavelen,transmission.atmosphere[filtre].sb, name='LSST::'+filtre,wave_unit=u.nm)
             else:
                 band=sncosmo.Bandpass(transmission.system[filtre].wavelen,transmission.system[filtre].sb, name='LSST::'+filtre,wave_unit=u.nm) 
             sncosmo.registry.register(band, force=True)
-
+        """
         source=sncosmo.get_source(model,version=version)
         dust = sncosmo.OD94Dust()
 
@@ -36,15 +38,18 @@ class Fit_LC:
         self.SN_fit_model=sncosmo.Model(source=source)
         self.SN_fit_model.set(z=self.z)
         #SN_fit_model.set_source_peakabsmag(peakAbsMagBesselB, 'bessellB', 'vega',cosmo=self.astropy_cosmo)
+
     def __call__(self,meas):
 
+        #time_begin=time.time()
         t=meas
         select=t[np.where(np.logical_and(t['flux']/t['fluxerr']>5.,t['flux']>0.))]
-        idx=select['band']!='LSST::u'
-        select=select[idx]
+        #print 'hello',select.meta
+        #idx=select['band']!='LSST::u'
+        #select=select[idx]
 
         #print 'I will fit',meas
-
+        """
         if self.z > 0.35:
            idx=select['band']!='LSST::g'
            select=select[idx] 
@@ -56,28 +61,67 @@ class Fit_LC:
         if self.z > 1.27:
            idx=select['band']!='LSST::i'
            select=select[idx]
-
+        """
         #print 'what I have to fit',len(select)
         try:
             #print 'trying to fit',len(select)
             res, fitted_model = sncosmo.fit_lc(select, self.SN_fit_model,['t0', 'x0', 'x1', 'c'],bounds={'z':(self.z-0.001, self.z+0.001)})
-
+            #print 'total elapse time fit',time.time()-time_begin
             #self.sigma_c=res['errors']['c']
             mbfit=fitted_model._source.peakmag('bessellb','vega')
+            #mbfit=0.
             params={}
             #print res
             for i,par in enumerate(fitted_model.param_names):
                 params[par]=fitted_model.parameters[i]
-            snutils=SN_Utils()
-            mbfit_calc=snutils.mB(params)
+                #print par
+            #snutils=SN_Utils()
+            #mbfit_calc=snutils.mB(params)
+            #print 'total elapse time mbfit',time.time()-time_begin,mbfit
+            """
+            
+            
             covar_mb=snutils.Covar(params,res['covariance'],res['vparam_names'])
+            print covar_mb
+            
+            #print 'fitted',res['vparam_names']
+            covar_mb={} 
+            what=(params['z'],params['x0'],params['x1'],params['c'])
+            print what
+            Der=np.zeros(shape=(len(res['vparam_names']),1))
+            ider=-1
+            for i,key in enumerate(res['vparam_names']):
+                ider+=1
+                if key == 't0':
+                    Der[ider]=0.
+                else:
+                    Der[ider]=griddata((deriv_mb['z'],deriv_mb['X0'],deriv_mb['X1'],deriv_mb['Color']), deriv_mb['dmb_d'+key],what , method='nearest')
+                
+
+            print 'hhh',res['covariance'],Der
+            Prod=np.dot(res['covariance'],Der)
+
+            #print 'prod',Prod
+            for i,key in enumerate(res['vparam_names']):
+                if key != 'c':
+                    covar_mb['salt2.Cov'+key.upper()+'mb']=Prod[i,0]
+                else:
+                    covar_mb['salt2.CovColormb']=Prod[i,0] 
+
+            covar_mb['salt2.Covmbmb']=np.asscalar(np.dot(Der.T,Prod))
+
+            print covar_mb
+            #print 'total elapse time covar',time.time()-time_begin
             #print 'after fit',mbfit,mbfit_calc,mbfit-mbfit_calc
             #snutils.Test()
-
+            """
             if self.Plot:
                 sncosmo.plot_lc(select, model=fitted_model,color='r',pulls=False,errors=res.errors) 
                 plt.show()
-            return res,fitted_model,mbfit,covar_mb,'ok'
+            #print 'total elapse time',time.time()-time_begin
+            #return res,fitted_model,mbfit,covar_mb,'ok'
+            return res,fitted_model,mbfit,'ok'   
+
         except (RuntimeError, TypeError, NameError):
                 """
                 print select
@@ -89,7 +133,9 @@ class Fit_LC:
                 #print 'crashed'
                 #self.Plot_bands(select)
                 #plt.show()
-                return None,None,-1,None,'crash'
+                #return None,None,-1,None,'crash'
+                return None,None,-1,'crash'
+
     @property
     def sigma_c(self):
         return self.sigma_c

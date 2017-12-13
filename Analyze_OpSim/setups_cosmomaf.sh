@@ -15,7 +15,7 @@ export LSSTSW=/sps/lsst/Library/new/lsstsw
 export EUPS_PATH=$LSSTSW/stack
 source $LSSTSW/bin/setup.sh
 
-dir_tag=/sps/lsst/data/dev/pgris/sims_operations
+dir_tag=/pbs/throng/lsst/users/gris/sims_operations
 
 export PYTHONPATH=${dir_tag}/lib/python2.7/site-packages:$PYTHONPATH
 export PYTHONPATH=../Cosmo_Maf:$PYTHONPATH
@@ -37,4 +37,4 @@ setup -k -r ${dir_tag}/sims_catalogs
 setup -k -r ${dir_tag}/sims_maf
 #setup -k -r ../sims_operations
 export FAKE_THROUGH=snfit_data/Instruments/LSST.fake
-export OPSIM_LOGS=/sps/lsst/data/dev/pgris/Ana_Cadence/OpSimLogs
+export OPSIM_LOGS=/pbs/throng/lsst/users/gris/Ana_Cadence/OpSimLogs

@@ -7,9 +7,11 @@ class Observations:
 
         if filename != '':
             data=self.Load(filename)
+            #data=np.sort(data,order='mjd')
             data.sort(order='mjd')
             self.all_seasons=data
             self.seasons=self.Get_Seasons(data)
+            self.Remove_Poor_Seasons()
             self.Ra=np.unique(data['Ra'])[0]
             self.Dec=np.unique(data['Dec'])[0]
         else:
@@ -39,7 +41,7 @@ class Observations:
                 r.append(tuple(tofill))
         return np.rec.fromrecords(r,names=varname)
             
-    def Get_Seasons(self,data,season_length=110):
+    def Get_Seasons(self,data,season_length=95):
         
         thediff=data['mjd'][1:]-data['mjd'][:-1]
         idx,=np.where(thediff > season_length)
@@ -57,6 +59,19 @@ class Observations:
 
         return seasons
             
+
+    def Remove_Poor_Seasons(self):
+
+        iseason=-1
+        res={}
+
+        for i in range(len(self.seasons)):
+            #print 'season',i,len(self.seasons[i])
+            if len(self.seasons[i])>10:
+                iseason+=1
+                res[iseason]=self.seasons[i]
+
+        self.seasons=res
 
 
 

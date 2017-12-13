@@ -29,7 +29,6 @@ class SN_Rate:
             thebins=np.append(thebins,thebins[len(bins)-1]+(bins[1]-bins[0]))
 
         rate, err_rate = self.sn_rate(thebins)
-        error_rel=err_rate/rate
                 
         area = self.survey_area / STERADIAN2SQDEG # or area= self.survey_area/41253.
     
@@ -52,8 +51,7 @@ class SN_Rate:
         nsn = nsn[1:] - nsn[:-1]
         #err_nsn= np.sqrt(err_nsn[1:]**2 + err_nsn[:-1]**2)
         #err_nsn= [np.sqrt(vala**2+valb**2) for vala,valb in zip(err_nsn[1:],err_nsn[:-1])]
-        err_nsn=np.sqrt(err_nsn[1:]**2+err_nsn[:-1]**2-2.*err_nsn[1:]*err_nsn[:-1])
-        #err_nsn=nsn * error_rel[1:]
+        err_nsn=np.sqrt(-err_nsn[:-1]**2+err_nsn[1:]**2)
         return zz,rate, err_rate,nsn, err_nsn
         
 
@@ -75,19 +73,11 @@ class SN_Rate:
         err_rate=0.03E-4
         err_expn=0.28
         my_z = np.copy(z)
-        #my_z[my_z>1.] = 1.
+        my_z[my_z>1.] = 1.
         rate_sn=rate * np.power(1+my_z, expn)
         
         #err_rate_sn=np.power(err_rate/rate,2.)+np.power(np.log(1+my_z)*err_expn,2.)
         err_rate_sn=np.power(1+my_z, 2.*expn)*np.power(err_rate,2.)+np.power(rate_sn*np.log(1+my_z)*err_expn,2.)
-        #print 'rates',rate_sn,np.power(err_rate_sn,0.5)/rate_sn
-        
-        """
-        idx = my_z==1.
-        idxb = my_z>1.
-        rate_sn[idxb]=rate_sn[idx]
-        err_rate_sn[idxb]=err_rate_sn[idx]
-        """
         return rate_sn,np.power(err_rate_sn,0.5)
 
     def dilday_rate(self,z):

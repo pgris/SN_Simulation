@@ -26,10 +26,13 @@ thedir_obs=opts.dirobs
 X1=opts.stretch
 Color=opts.color
 
-for seas in [0]:
-    dict_data['DD_'+str(fieldid)+'_'+str(seas+1)]=Id(thedir=thedir,thedir_obs=thedir_obs,fieldname=fieldname,fieldid=fieldid,X1=X1,Color=Color,season=seas,colorfig='k')
+for seas in range(0,10):
+     #dict_data['DD_bright'+str(fieldid)+'_'+str(seas+1)]=Id(thedir=thedir,thedir_obs=thedir_obs,fieldname=fieldname,fieldid=fieldid,X1=X1,Color=Color,season=seas,colorfig='k')
+    dict_data['DD_bright'+str(fieldid)+'_'+str(seas+1)]=Id(thedir=thedir,thedir_obs=thedir_obs,fieldname=fieldname,fieldid=fieldid,X1=2.0,Color=-0.2,season=seas,colorfig='k')
+    dict_data['DD_medium'+str(fieldid)+'_'+str(seas+1)]=Id(thedir=thedir,thedir_obs=thedir_obs,fieldname=fieldname,fieldid=fieldid,X1=0.0,Color=0.0,season=seas,colorfig='k') 
+    dict_data['DD_faint'+str(fieldid)+'_'+str(seas+1)]=Id(thedir=thedir,thedir_obs=thedir_obs,fieldname=fieldname,fieldid=fieldid,X1=-2.0,Color=0.2,season=seas,colorfig='k') 
 
-LC_Ana(dict_data,zmin=0.01,zmax=1.1,bin_z=0.05)
+LC_Ana(dict_data,zmin=0.01,zmax=1.,bin_z=0.05)
 
 
    

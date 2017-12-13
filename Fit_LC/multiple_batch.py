@@ -26,7 +26,7 @@ def batch(tab, ibatch,simu_name):
     name_id=fieldname+'_'+str(fieldid)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)+'_'+str(ibatch)+'_'+simu_name
     log = dirLog + '/'+name_id+'.log'
 
-    qsub = "qsub -P P_lsst -l sps=1,ct=03:00:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
+    qsub = "qsub -P P_lsst -l sps=1,ct=30:00:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
     scriptName = dirScript+'/'+name_id+'.sh'
     
     script = open(scriptName,"w")
@@ -43,7 +43,7 @@ def batch(tab, ibatch,simu_name):
     script.write("EOF" + "\n")
     script.close()
     os.system("sh "+scriptName)
-    time.sleep(1)
+    #time.sleep(1)
 
 
 
@@ -52,6 +52,7 @@ parser = OptionParser()
 parser.add_option("-f", "--fieldname", type="string", default='WFD', help="filter [%default]")
 parser.add_option("-i", "--fieldid", type="int", default=309, help="filter [%default]")
 parser.add_option("-s", "--season", type="int", default=0, help="filter [%default]")
+parser.add_option("--z", type="float", default=-1.0, help="redshift [%default]")
 parser.add_option("-t", "--sntype", type="string", default='Ia', help="filter [%default]")
 #parser.add_option("-d", "--dbFile", type="string",default='None', help="dbFile to process [%default]")
 parser.add_option("-x", "--stretch", type="float", default=2.0, help="filter [%default]")
@@ -59,6 +60,7 @@ parser.add_option("-c", "--color", type="float", default=-0.2, help="filter [%de
 parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter [%default]")
 parser.add_option("--simulator", type="string", default="snscosmo", help="filter [%default]")
 parser.add_option("--dirout", type="string", default="Fitted_Light_Curves", help="filter [%default]")
+parser.add_option("--n_per_batch", type="int", default="10", help="filter [%default]")
 #parser.add_option("-r", "--T0random", type="string", default="No", help="filter [%default]")
 
 opts, args = parser.parse_args()
@@ -74,8 +76,15 @@ sntype=opts.sntype
 simu_name=opts.simulator
 dirout=opts.dirout
 #T0random=opts.T0random
+z=opts.z
+nfiles_per_batch=opts.n_per_batch
 
-files=glob.glob('../'+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_*_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
+
+if z == -1.0:
+    files=glob.glob('/sps/lsst/users/gris/'+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_*_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
+else:
+    files=glob.glob('/sps/lsst/users/gris/'+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
+
 
 r=[]
 
@@ -99,7 +108,7 @@ for fi in files:
 params= np.rec.fromrecords(r,names=['dirmeas','fieldname','fieldid','z','season','X1','Color','sntype','T0min','T0max','dirout'])
 print len(params)
 
-nfiles_per_batch=5
+
 
 nbatches=len(params)/nfiles_per_batch
 if len(params)%nfiles_per_batch > 0:

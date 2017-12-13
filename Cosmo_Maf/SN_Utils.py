@@ -148,6 +148,7 @@ class SN_Utils:
             par_var[key]+=h
             ider+=1
             Der[ider]=(self.mB(par_var)-self.mB(params))/h
+            print 'there man',key,params[key],Der[ider]
             par_var[key]-=h
 
         Prod=np.dot(covar,Der)
@@ -162,6 +163,25 @@ class SN_Utils:
 
         return res
         
+
+    def Deriv_mb(self,params,vparam_names):
+        
+        res={}
+        h=1.e-6
+        #Der=np.zeros(shape=(len(vparam_names),1))
+        Der={}
+
+        #print params
+        par_var=params.copy()
+        ider=-1
+        for i,key in enumerate(vparam_names):
+            par_var[key]+=h
+            ider+=1
+            Der[key]=(self.mB(par_var)-self.mB(params))/h
+            par_var[key]-=h
+
+        return Der
+
 
     def Test(self):
 

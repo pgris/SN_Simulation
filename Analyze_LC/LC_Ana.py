@@ -8,7 +8,7 @@ from scipy.interpolate import UnivariateSpline
 from SN_Rate import *
 
 class LC_Ana:
-    def __init__(self,data_dict={},zmin=0.,zmax=1.2,bin_z=0.01,data_dir='../Fitted_Light_Curves'):
+    def __init__(self,data_dict={},zmin=0.,zmax=1.2,bin_z=0.01,data_dir='../../Fitted_Light_Curves_snsim'):
 
         self.data={}
         self.data_dir=data_dir
@@ -53,11 +53,11 @@ class LC_Ana:
                     pkl_file = open(fi,'rb')
                     loaded=pkl.load(pkl_file)
                     print 'loading',fi
-                    if 'mbsim' in loaded.dtype.names:
-                        if not key in self.data.keys():
-                            self.data[key]=loaded
-                        else:
-                            self.data[key]=np.vstack((self.data[key],loaded))
+                    #if 'mbsim' in loaded.dtype.names:
+                    if not key in self.data.keys():
+                        self.data[key]=loaded
+                    else:
+                        self.data[key]=np.vstack((self.data[key],loaded))
 
                 pkl_out = open(sum_file,'wb')
                 

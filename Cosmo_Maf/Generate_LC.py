@@ -18,7 +18,7 @@ import os
 from scipy import interpolate, integrate
 
 class Generate_LC:
-    def __init__(self,parameters,fit=False,model='salt2-extended',version='1.0',telescope=None,ra=6.0979440,dec=-1.1051600,airmass=1.2):
+    def __init__(self,parameters,fit=False,model='salt2-extended',version='1.0',telescope=None,ra=6.0979440,dec=-1.1051600,airmass=1.2,X0=None,dL=None):
 
         #time_begin=time.time()
 
@@ -85,14 +85,21 @@ class Generate_LC:
         self.SN=sncosmo.Model(source=source)
         
         self.z=self.param['z']
-        self.Cosmology()
-        lumidist=self.astropy_cosmo.luminosity_distance(self.param['z']).value*1.e3
+        if X0 is None:
+            self.Cosmology()
+            lumidist=self.astropy_cosmo.luminosity_distance(self.param['z']).value*1.e3
+            self.dL=lumidist
         #X0_snsim = self.X0_norm_snsim() / lumidist** 2
-        X0= self.X0_norm()/ lumidist** 2
-        #print 'before alpha beta',X0, X0_snsim, X0_snsim/X0
-        alpha=0.13
-        beta=3.
-        X0 *= np.power(10., 0.4*(alpha*self.param['X1'] -beta*self.param['Color']))
+            X0= self.X0_norm()/ lumidist** 2
+            print 'before alpha beta',X0
+            alpha=0.13
+            beta=3.
+            X0 *= np.power(10., 0.4*(alpha*self.param['X1'] -beta*self.param['Color']))
+            self.X0=X0
+
+        else:
+            self.X0=X0
+            self.dL=dL
         #print 'llla',X0,alpha,beta,param['X1'],param['Color'],param['z'],lumidist
         #self.X0=X0
         #print 'hello x0',X0,lumidist
@@ -101,8 +108,8 @@ class Generate_LC:
         self.SN.set(t0=self.param['DayMax'])
         self.SN.set(c=self.param['Color'])
         self.SN.set(x1=self.param['X1'])
-        self.SN.set(x0=X0)
-        self.X0=X0
+        self.SN.set(x0=self.X0)
+    
         #print 'total elapse time init b',time.time()-time_begin
 
         #self.SED={}
@@ -355,6 +362,7 @@ class Generate_LC:
         zp=2.5*np.log10(flux)+mag
         flux_at_10pc = np.power(10., -0.4 * (self.peakAbsMagBesselB-zp))
         
+        print 'zp',zp,flux_at_10pc
 
         source=sncosmo.get_source(self.model,version=self.version)
         SN=sncosmo.Model(source=source)
