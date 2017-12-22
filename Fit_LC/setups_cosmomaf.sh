@@ -38,3 +38,4 @@ setup -k -r ${dir_tag}/sims_maf
 #setup -k -r ../sims_operations
 export FAKE_THROUGH=snfit_data/Instruments/LSST.fake
 export OPSIM_LOGS=/pbs/throng/lsst/users/gris/Ana_Cadence/OpSimLogs
+export PYTHONPATH=/pbs/throng/lsst/users/gris/lib/python2.7/site-packages/:${PYTHONPATH}

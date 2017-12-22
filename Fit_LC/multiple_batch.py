@@ -4,7 +4,7 @@ import numpy as np
 import glob
 import time
 
-def batch(tab, ibatch,simu_name):
+def batch(tab, ibatch,simu_name,multiproc):
 
     cwd = os.getcwd()
     dirScript= cwd + "/scripts"
@@ -26,7 +26,11 @@ def batch(tab, ibatch,simu_name):
     name_id=fieldname+'_'+str(fieldid)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)+'_'+str(ibatch)+'_'+simu_name
     log = dirLog + '/'+name_id+'.log'
 
-    qsub = "qsub -P P_lsst -l sps=1,ct=30:00:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
+    if multiproc == 'yes':
+        qsub = "qsub -P P_lsst -l sps=1,ct=30:00:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
+    else:
+        qsub = "qsub -P P_lsst -l sps=1,ct=30:00:00,h_vmem=16G -j y -o "+ log + " <<EOF"
+ 
     scriptName = dirScript+'/'+name_id+'.sh'
     
     script = open(scriptName,"w")
@@ -38,7 +42,7 @@ def batch(tab, ibatch,simu_name):
     script.write(" source setups_cosmomaf.sh\n")
 
     for val in tab:
-        cmd='python fit_lcs.py --z '+str(val['z'])+' --fieldname '+val['fieldname']+' --fieldid '+str(val['fieldid'])+' --season '+str(val['season'])+' --sntype '+val['sntype']+' --stretch '+str(val['X1'])+' --color '+str(val['Color'])+' --dirmeas '+val['dirmeas']+' --T0min '+str(val['T0min'])+' --T0max '+str(val['T0max'])+' --dirout '+val['dirout']
+        cmd='python fit_lcs.py --z '+str(val['z'])+' --fieldname '+val['fieldname']+' --fieldid '+str(val['fieldid'])+' --season '+str(val['season'])+' --sntype '+val['sntype']+' --stretch '+str(val['X1'])+' --color '+str(val['Color'])+' --dirmeas '+val['dirmeas']+' --T0min '+str(val['T0min'])+' --T0max '+str(val['T0max'])+' --dirout '+val['dirout']+' --multiproc '+multiproc
         script.write(cmd+" \n")
     script.write("EOF" + "\n")
     script.close()
@@ -62,6 +66,7 @@ parser.add_option("--simulator", type="string", default="snscosmo", help="filter
 parser.add_option("--dirout", type="string", default="Fitted_Light_Curves", help="filter [%default]")
 parser.add_option("--n_per_batch", type="int", default="10", help="filter [%default]")
 #parser.add_option("-r", "--T0random", type="string", default="No", help="filter [%default]")
+parser.add_option("--multiproc", type="string", default='yes', help="filter [%default]")
 
 opts, args = parser.parse_args()
 
@@ -78,12 +83,13 @@ dirout=opts.dirout
 #T0random=opts.T0random
 z=opts.z
 nfiles_per_batch=opts.n_per_batch
+multiproc=opts.multiproc
 
-
+main_dir_in='/sps/lsst/data/dev/pgris/'
 if z == -1.0:
-    files=glob.glob('/sps/lsst/users/gris/'+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_*_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
+    files=glob.glob(main_dir_in++dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_*_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
 else:
-    files=glob.glob('/sps/lsst/users/gris/'+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
+    files=glob.glob(main_dir_in+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
 
 
 r=[]
@@ -94,15 +100,17 @@ for fi in files:
     T0min=fisplit[-2]
     T0max=fisplit[-1].split('.')[0]
     """
-    spl=fi.split(str(fieldid))
-    splb=spl[2].split('_')
-    z=splb[1]
-    stretch=float(splb[3])
-    color=float(splb[5])
-    T0min=splb[6]
-    T0max=splb[7].split('.')[0]
     
-    #print z,T0min,T0max
+    spl=fi.split('/')
+    
+    splb=spl[-1].split('_')
+    
+    z=splb[2]
+    stretch=float(splb[4])
+    color=float(splb[6])
+    T0min=splb[7]
+    T0max=splb[8].split('.')[0]
+    
     r.append((dirmeas,fieldname,fieldid,z,season,stretch,color,sntype,T0min,T0max,dirout))
 
 params= np.rec.fromrecords(r,names=['dirmeas','fieldname','fieldid','z','season','X1','Color','sntype','T0min','T0max','dirout'])
@@ -119,7 +127,7 @@ for i in range(nbatches):
     imax=imin+nfiles_per_batch
     if imax >= len(params):
         imax=len(params)
-    batch(params[imin:imax],i,simu_name)
+    batch(params[imin:imax],i,simu_name,multiproc)
 
 """
 cmd='python batch.py --z '+str(z)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --T0min '+str(T0min)+' --T0max '+str(T0max)

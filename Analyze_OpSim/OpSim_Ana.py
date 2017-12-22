@@ -5,6 +5,7 @@ from matplotlib import cm
 import sncosmo
 from Telescope import *
 from astropy import (cosmology, units as u, constants as const)
+import pickle as pkl
 
 def median(sel,var):
     
@@ -15,8 +16,9 @@ def median(sel,var):
         selb=np.sort(sel)
 
     num=len(selb)
+
     
-    if num >2:
+    if num >=5:
         n_lower=num/2-1.96*np.sqrt(float(num))/2.
         n_upper=1+num/2+1.96*np.sqrt(float(num))/2.
 
@@ -27,10 +29,7 @@ def median(sel,var):
         #print 'hello',num,np.median(selb),int(n_lower),int(n_upper),selb[int(n_lower)],selb[int(n_upper)],selb
         res=np.median(selb),selb[int(n_lower)],selb[int(n_upper)]
     else:
-        if len(selb) == 2:
-            res=selb[1]-selb[0],0,0
-        else:
-            return 0,0,0
+        return -1.,-1.,-1.
 
     return res
 
@@ -579,6 +578,24 @@ def Print_begin(f,fieldname,fieldid):
     f.write(chap+'\n')
     f.write('\\hline'+'\n')
         
+def Print_begin_multi(f,fieldname):
+    
+    f.write('\\begin{table}[ht]'+'\n')
+    f.write('\\begin{center}'+'\n')
+    f.write('\\caption{'+fieldname+' fields. Median 5-$\sigma$ depth and sky magnitudes.}\label{tab:'+fieldname+'_median_mag}\n')
+    
+    f.write('\\begin{tabular}{ccccccccccccc}'+'\n')
+    f.write('\\hline'+'\n')
+    f.write(' & \\multicolumn{6}{c}{5-$\sigma$ depth [mag]} & \\multicolumn{6}{c}{m$_{sky}$ [mag]} \\\\'+'\n')
+    chap='Year'
+    for band in bands:
+        chap+=' & '+band
+    for band in bands:
+        chap+=' & '+band
+    chap+= ' & \\\\'
+    f.write(chap+'\n')
+    f.write('\\hline'+'\n')
+
 def Print_end(f):
     
     f.write('\\hline'+'\n')
@@ -924,7 +941,7 @@ def Fill_Medians(myseason,season):
             seeing_med,seeing_lower,seeing_upper=median(sel,'seeing')
             median_cad,lower_cad,upper_cad=median(diff,'')
             #nexp_med,nexp_low,nexp_upper=median(sel,'Nexp')
-            r.append((key,season,b,np.mean(diff),np.std(diff),np.max(sel['mjd'])-np.min(sel['mjd']),corresp[b],m5_med,m5_lower,m5_upper,np.sum(sel['exptime']),median_cad,upper_cad,lower_cad,np.sum(sel['Nexp']),msky_med,msky_lower,msky_upper,airmass_med,airmass_lower,airmass_upper,seeing_med,seeing_lower,seeing_upper))
+            r.append((key,season,b,np.mean(diff),np.std(diff),np.max(sel['mjd'])-np.min(sel['mjd']),corresp[b],m5_med,m5_lower,m5_upper,np.sum(sel['exptime']),median_cad,upper_cad,lower_cad,np.sum(sel['Nexp']),msky_med,msky_lower,msky_upper,airmass_med,airmass_lower,airmass_upper,seeing_med,seeing_lower,seeing_upper,np.mean(sel['Ra']),np.mean(sel['Dec'])))
 
     idxc = myseason['band']!='LSSTPG::nn'
     selcb=myseason[idxc]
@@ -938,7 +955,7 @@ def Fill_Medians(myseason,season):
         median_cad,lower_cad,upper_cad=median(diff,'')
         seeing_med,seeing_lower,seeing_upper=median(sel,'seeing')
         #nexp_med,nexp_low,nexp_upper=median(sel,'Nexp')
-        r.append((key,season,'a',np.mean(diff),np.std(diff),np.max(selcb['mjd'])-np.min(selcb['mjd']),corresp['a'],m5_med,m5_lower,m5_upper,np.sum(selcb['exptime']),median_cad,upper_cad,lower_cad,np.sum(selcb['Nexp']),msky_med,msky_lower,msky_upper,airmass_med,airmass_lower,airmass_upper,seeing_med,seeing_lower,seeing_upper))
+        r.append((key,season,'a',np.mean(diff),np.std(diff),np.max(selcb['mjd'])-np.min(selcb['mjd']),corresp['a'],m5_med,m5_lower,m5_upper,np.sum(selcb['exptime']),median_cad,upper_cad,lower_cad,np.sum(selcb['Nexp']),msky_med,msky_lower,msky_upper,airmass_med,airmass_lower,airmass_upper,seeing_med,seeing_lower,seeing_upper,np.mean(selcb['Ra']),np.mean(selcb['Dec'])))
 
     return r,alldiffs
 
@@ -966,6 +983,11 @@ fieldids=[310]
 
 #fieldids=fieldids['fieldid']
 
+filelist='fieldIDs_minion_1016_'+fieldname+'.txt'
+fields=np.loadtxt(filelist,dtype={'names': ('name','fieldid'),'formats': ('S8','i4')})
+
+fieldids=fields['fieldid'][:]
+
 for fieldid in fieldids:
     #print 'hello',fieldid
     name='Observations_'+fieldname+'_'+str(fieldid)+'.txt'
@@ -985,6 +1007,7 @@ fieldcolors=dict(zip([309,310,1427,2412,2786],'bgyrm'))
 #fieldcolors=dict(zip([fieldids[0],744,1427,2412,2786],'bgyrm'))
 ra=[]
 all_diff={}
+
 for key, vals in myobs.items():
     print key,len(vals.seasons)
     all_diff[key]={}
@@ -1007,16 +1030,62 @@ for key, vals in myobs.items():
         r+=ro
         all_diff[key][season]=alldiffs
         
-        
-        """
-        plt.hist(sel['mjd'],bins=int(np.max(sel['mjd']))-int(np.min(sel['mjd'])))
+resu=np.rec.fromrecords(r,names=['fieldid','season','band','mean_cadence','rms_cadence','duration','ib','m5','m5_lower','m5_upper','obstime','median_cadence','upper_cadence','lower_cadence','nexp_sum','msky','msky_lower','msky_upper','airmass','airmass_lower','airmass_upper','seeing','seeing_lower','seeing_upper','ra','dec'])
+Nobs=np.rec.fromrecords(ra,names=['season','band','T0','Nbef','Naft','Nmeas'])
 
-        plt.show()
-        """
+pkl_file = open(fieldname+'.pkl','wb')
+pkl.dump(resu, pkl_file)
+pkl_file.close()
+"""
+     
+r=[]
+for season in range(10):
+    fields_all=None
+    for key in myobs.keys():
+        if len(myobs[key].seasons) > season :
+            myseason=myobs[key].seasons[season]
+            if fields_all is None:
+                fields_all=myseason
+            else:
+                fields_all=np.concatenate((fields_all,myseason))
+    #print fields_all['Ra']
+    for band in 'ugrizy':
+        idx = fields_all['band']=='LSSTPG::'+band
+        sel= fields_all[idx]
+        m5_med,m5_lower,m5_upper=median(sel,'m5sigmadepth') 
+        msky_med,msky_lower,msky_upper=median(sel,'sky')
+        print band,m5_med,m5_lower,m5_upper,msky_med,msky_lower,msky_upper
+        r.append((season,band,m5_med,m5_lower,m5_upper,msky_med,msky_lower,msky_upper))
+
+resu=np.rec.fromrecords(r,names=['season','band','m5','m5_l','m5_u','msky','msky_l','msky_u'])
+
+
+f = open('Cadence_tex/'+fieldname+'_m5msky.tex','w')
+Print_begin_multi(f,fieldname)
+        
+for season in range(10):
+    iid = resu['season']==season
+    toprint=str(season+1)
+    sel_seas=resu[iid]
+    for what in ['m5','msky']:
+        for band in 'ugrizy':
+            ik=sel_seas['band']==band
+            ssel=sel_seas[ik]
+            med=np.asscalar(ssel[what])
+            med_p=np.asscalar(ssel[what+'_u']-ssel[what])
+            med_m=np.asscalar(ssel[what]-ssel[what+'_l'])
+            #toprint+=' & '+str(round(med,2))+'$^{+'+str(round(med_p,2))+'}_{-'+str(round(med_m,2))+'}$'
+            toprint+=' & '+str(round(med,1))
+    print toprint
+    toprint+=' \\\\'
+    f.write(toprint+ '\n')
+Print_end(f)
+
+"""
 
 #print 'alors?',len(resu)
-resu=np.rec.fromrecords(r,names=['fieldid','season','band','mean_cadence','rms_cadence','duration','ib','m5','m5_lower','m5_upper','obstime','median_cadence','upper_cadence','lower_cadence','nexp_sum','msky','msky_lower','msky_upper','airmass','airmass_lower','airmass_upper','seeing','seeing_lower','seeing_upper'])
-Nobs=np.rec.fromrecords(ra,names=['season','band','T0','Nbef','Naft','Nmeas'])
+
+
 
 """
 print resu
@@ -1038,8 +1107,11 @@ for fieldid in fieldids:
 #Plot_Obs_per_Field(resu)
 #Plot_Cadence_per_Year(resu)
 
+"""
 for field in fieldids:
     Plot_Cadence_vs_Year(resu,'WFD',field)
+"""
+
 
 #Plot_Nobs(Nobs)
 #Plot_median(resu,fieldids,fieldcolors)

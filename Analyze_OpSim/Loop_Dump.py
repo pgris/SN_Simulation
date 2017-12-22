@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-fieldname='WFD'
+fieldname='NorthEclipticSpur-18c'
 
 thefile='fieldIDs_minion_1016_'+fieldname+'.txt'
 

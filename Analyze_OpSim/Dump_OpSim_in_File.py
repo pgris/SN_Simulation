@@ -23,6 +23,9 @@ def Get_mean_finSeeing(observations):
 
 def Get_coadd(fieldname,filt,newsky=False):
 
+    if len(filt) == 0:
+        return None
+
     print type(filt)
     filt.sort(order='expMJD')
     """
@@ -30,18 +33,20 @@ def Get_coadd(fieldname,filt,newsky=False):
         print val
     print np.mean(filt['expMJD'][:10])
     """
-
+    #print filt['expMJD']
+    
     diff=[io-jo for jo,io in zip(filt['expMJD'][:-1], filt['expMJD'][1:])]
     
     sel=[i+1 for i in range(len(diff)) if 24.*60.*60.*diff[i]> 40.]
     sel=[0]+sel+[len(filt)]
     r=[]
 
-    #print sel
+    print sel
 
     var_tot=['filter','fieldRA','fieldDec']
     vars_mean=['expMJD','rawSeeing','moonPhase','filtSkyBrightness','airmass','fiveSigmaDepth']
 
+    
     for i in range(len(sel)-1):
         ia=sel[i]
         ib=sel[i+1]
@@ -129,35 +134,36 @@ def Do_It(fieldname,band,toprocess,newsky=False,out_q=None):
     res=[]
     coadd=Get_coadd(fieldname,toprocess[toprocess['filter']==band],newsky=newsky)
     #print 'ee',band,len(coadd)
-    for val in coadd:
-        filtre=val['filter']
-        ra_rad=val['fieldRA']
-        dec_rad=val['fieldDec']
-        toprint = 'LSSTPG::'+filtre+' '
-        toprint+=str(format(val['expMJD'],'.7f'))+' '
-        toprint+=str(int(val['visitExpTime']))+' '
+    if coadd is not None:
+        for val in coadd:
+            filtre=val['filter']
+            ra_rad=val['fieldRA']
+            dec_rad=val['fieldDec']
+            toprint = 'LSSTPG::'+filtre+' '
+            toprint+=str(format(val['expMJD'],'.7f'))+' '
+            toprint+=str(int(val['visitExpTime']))+' '
             #toprint+=str(format(np.mean(Get_mean_finSeeing(val)),'.7f'))+' '
-        toprint+=str(format(val['rawSeeing'],'.7f'))+' '
+            toprint+=str(format(val['rawSeeing'],'.7f'))+' '
             #toprint+=str(format(np.mean(val['FWHMeff']),'.7f'))+' '
-        toprint+=str(format(val['finSeeing'],'.7f'))+' '
-        toprint+=str(format(val['moonPhase'],'.7f'))+' '
+            toprint+=str(format(val['finSeeing'],'.7f'))+' '
+            toprint+=str(format(val['moonPhase'],'.7f'))+' '
 	    #print sm.getComputedVals()
         
-        toprint+=str(format(val['filtSkyBrightness'],'.7f'))+' '
-        toprint+=str(val['kAtm'])+' '
-        toprint+=str(format(val['airmass'],'.7f'))+' '
+            toprint+=str(format(val['filtSkyBrightness'],'.7f'))+' '
+            toprint+=str(val['kAtm'])+' '
+            toprint+=str(format(val['airmass'],'.7f'))+' '
             #toprint+=str(format(np.mean(val['FWHMgeom']),'.7f'))+' '
             #toprint+=str(format(np.mean(val['FWHMeff']),'.7f'))+' '
-        toprint+=str(format(val['fiveSigmaDepth'],'.7f'))+' '
-        toprint+=str(val['Nvisits'])+' '
-        toprint+=str(format(val['fieldRA'],'.7f'))+' '
-        toprint+=str(format(val['fieldDec'],'.7f'))
+            toprint+=str(format(val['fiveSigmaDepth'],'.7f'))+' '
+            toprint+=str(val['Nvisits'])+' '
+            toprint+=str(format(val['fieldRA'],'.7f'))+' '
+            toprint+=str(format(val['fieldDec'],'.7f'))
             #m5_coadd=Get_fiveSigmaDepth_coadd(len(val),np.mean(val['fiveSigmaDepth']))
             #m5_coadd=Get_fiveSigmaDepth_coadd(1.,np.mean(val['fiveSigmaDepth']))
             #print 'hello',np.mean(val['fiveSigmaDepth']),m5_coadd
             #outputfile.write(toprint+'\n')
-        res.append(toprint+'\n')
-        print toprint
+            res.append(toprint+'\n')
+            print toprint
 
     if out_q is not None:
         out_q.put({band : res})

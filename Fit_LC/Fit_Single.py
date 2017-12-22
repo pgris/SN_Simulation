@@ -2,6 +2,9 @@ from Fit_LC import *
 import cPickle as pkl
 import matplotlib.pyplot as plt
 from astropy.table import vstack,Table,Column
+import h5py
+from astropy.table import Table
+
 
 class Fit_Single_LC:
     def __init__(self, lc,telescope,inum,output_q=None):
@@ -12,6 +15,7 @@ class Fit_Single_LC:
         self.bands_rest = 'grizy'
         self.dict_quality={}
         self.outdict={}
+        
         #self.snutils=snutils
         """
         print lc.meta
@@ -25,16 +29,16 @@ class Fit_Single_LC:
             self.dict_quality['N_aft_'+band]=0.
             self.dict_quality['cadence_'+band]=0.
             self.dict_quality['cadence_rms_'+band]=0.
-            self.dict_quality['m5sigma_'+band]=0.
-            self.dict_quality['m5sigma_rms_'+band]=0.
-            self.dict_quality['SNR_'+band]=0.0
+            #self.dict_quality['m5sigma_'+band]=0.
+            #self.dict_quality['m5sigma_rms_'+band]=0.
+            #self.dict_quality['SNR_'+band]=0.0
         self.dict_quality['N_bef_all']=0.
         self.dict_quality['N_aft_all']=0.
         self.dict_quality['phase_first']=0.
         self.dict_quality['phase_last']=0.
         self.dict_quality['cadence_all']=0.
         self.dict_quality['cadence_rms_all']=0.
-        self.dict_quality['SNR_tot']=0.0
+        #self.dict_quality['SNR_tot']=0.0
         
         if self.lc is not None:
             idx = self.lc['flux']>0.
@@ -79,16 +83,19 @@ class Fit_Single_LC:
         print self.outdict
         """
 
+        #self.Summary(num,name_out)
         #print self.Summary()
+        
         if output_q is not None:
             output_q.put({inum : self.Summary()})
-
+        
+        
     def Get_Quality_LC(self,lc, T0, z):
 
         #estimate the number of LC points (5 sigma) before and after T0 - observer frame
         #time_begin=time.time()
         lc.sort('time')
-        self.dict_quality['SNR_tot']=5.*np.power(np.sum(np.power(lc['flux_e_sec']/lc['flux_5sigma_e_sec'],2.)),0.5)
+        #self.dict_quality['SNR_tot']=5.*np.power(np.sum(np.power(lc['flux_e_sec']/lc['flux_5sigma_e_sec'],2.)),0.5)
                 #print lc
         #print 'total elapse time filling table a',time.time()-time_begin
         #time_beginc=time.time()
@@ -104,13 +111,13 @@ class Fit_Single_LC:
 
             if len(lc[idx])>=1:
                 
-                self.dict_quality['SNR_'+band]=5.*np.power(np.sum(np.power(lc['flux_e_sec'][idx]/lc['flux_5sigma_e_sec'][idx],2.)),0.5)
+                #self.dict_quality['SNR_'+band]=5.*np.power(np.sum(np.power(lc['flux_e_sec'][idx]/lc['flux_5sigma_e_sec'][idx],2.)),0.5)
                 mean_cadence, rms_cadence=self.Get_cadence(lc[idx])
                 #mean_cadence, rms_cadence=0,0
                 self.dict_quality['cadence_'+band]=mean_cadence
                 self.dict_quality['cadence_rms_'+band]=rms_cadence
-                self.dict_quality['m5sigma_'+band]=np.mean(lc[idx]['m5'])
-                self.dict_quality['m5sigma_rms_'+band]=np.std(lc[idx]['m5'])
+                #self.dict_quality['m5sigma_'+band]=np.mean(lc[idx]['m5'])
+                #self.dict_quality['m5sigma_rms_'+band]=np.std(lc[idx]['m5'])
             #calc+=time.time()-time_beginb
             #print 'total elapse time filling table b',time.time()-time_beginb
         #print 'total elapse time filling table c',time.time()-time_beginc
@@ -178,7 +185,7 @@ class Fit_Single_LC:
         #print 'going to fit',len(self.lc),self.lc.dtype
 
         #self.outdict['m5sigma']=np.median(self.lc['m5'])
-        self.outdict['airmass']=np.median(lc['airmass'])
+        #self.outdict['airmass']=np.median(lc['airmass'])
                                           
         res,fitted_model,mbfit,fit_status=myfit(lc)
 
@@ -293,3 +300,4 @@ class Fit_Single_LC:
         #print 'total elapse time filling table',time.time()-time_begin
         #print t
         return t
+        
