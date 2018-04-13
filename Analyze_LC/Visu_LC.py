@@ -2,57 +2,69 @@ import numpy as np
 from optparse import OptionParser
 import cPickle as pkl
 import glob
-from astropy.table import vstack
+from astropy.table import Table,vstack
 from scipy.spatial import distance
 import sncosmo
 from Telescope import *
 from astropy import (cosmology, units as u, constants as const)
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import h5py
 
 class Visu_LC:
-    def __init__(self,fieldname='DD',fieldid=744,X1=0.,Color=0.,season=0,z=0.1,T0min=900,T0max=920,data_dir='../Fitted_Light_Curves',lc_dir='../Light_Curves'):
+    def __init__(self,fieldname='DD',fieldid=744,X1=0.,Color=0.,season=0,z=0.1,DayMax=0.2,data_dir='../Fitted_Light_Curves',lc_dir='../Light_Curves'):
 
         self.data_dir=data_dir
-
-        dirmeas=self.data_dir+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
-        files = glob.glob(dirmeas+'/'+fieldname+'_'+str(fieldid)+'*_'+str(T0min)+'_'+str(T0max)+'.pkl')
-
-        tot_fit=None
-        for fi in files:
-            pkl_file = open(fi,'rb')
-            print 'loading',fi
-            if tot_fit is None:
-                tot_fit=pkl.load(pkl_file)
-            else:
-                tot_fit=vstack([tot_fit,pkl.load(pkl_file)])
-            
-        print tot_fit
-
-        points=[(tot_fit['X1'][i],tot_fit['Color'][i]) for i in range(len(tot_fit))]
         
-        idx=distance.cdist([(X1,Color)],points).argmin()
+        dirmeas=self.data_dir+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
+        #files = glob.glob(dirmeas+'/'+fieldname+'_'+str(fieldid)+'*_'+str(T0min)+'_'+str(T0max)+'.pkl')
+        fichid=fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(X1)+'_C_'+str(Color)+'*.hdf5'
+        print 'looking for',dirmeas+'/'+fichid,DayMax
+        files = glob.glob(dirmeas+'/'+fichid)
 
-        print idx,tot_fit[idx]
+        lc=None
+        for fi in files:
+            f = h5py.File(fi,'r')
+            print 'loading',fi,len(f.keys())
+            for i,key in enumerate(f.keys()):
+                tab=Table.read(f, path=key)
+                """
+                for val in tab:
+                    print val['DayMax'],float(DayMax),val['DayMax']-float(DayMax)
+                """
+                idxb = np.abs(tab['DayMax']-DayMax)<1.e-5
+                sel=tab[idxb]
+                if len(sel) > 0:
+                    print 'yes found',len(tab)
+                    lc=sel
+                    idx=(sel['N_bef_all']>=4)&(sel['N_aft_all']>=10)
+                    idx&=(sel['status']=='go_fit')&(sel['fit_status']=='fit_ok')
+                    idx&=(sel['phase_first']<=-5)&(sel['phase_last']>=20)
+                    print 'Selection',len(sel[idx]),sel['N_bef_all'],sel['N_aft_all'],sel['status'],sel['fit_status'],sel['phase_first'],sel['phase_last']
+                    break
 
-        sn_id=tot_fit[idx]
-
+        #print len(lc),lc
         #grab corresponding LC
+
         dir_lc=dirmeas.replace(data_dir,lc_dir)
 
         tot_lc=[]
-        files = glob.glob(dir_lc+'/'+fieldname+'_'+str(fieldid)+'*_'+str(T0min)+'_'+str(T0max)+'.pkl')
+        files = glob.glob(dir_lc+'/'+fichid)
+        lcpoints=None
         for fi in files:
-            pkl_file = open(fi,'rb')
-            print 'loading',fi
-            if not tot_lc:
-                tot_lc=pkl.load(pkl_file)
-            else:
-                tot_lc=tot_lc+pkl.load(pkl_file)
+            print 'loading',fi    
+            f = h5py.File(fi,'r')
+            for i,key in enumerate(f.keys()):
+                tab=Table.read(f, path=key)
+                #print tab
+                if np.abs(tab.meta['DayMax']-DayMax)<1.e-5:
+                    print 'yes found',len(tab)
+                    lcpoints=tab
+                    break 
 
-        print 'hello',len(tot_lc)
+        #print lcpoints
 
-
+        
         telescope=Telescope(airmass=np.median(1.2))
 
         transmission=telescope.throughputs
@@ -61,6 +73,10 @@ class Visu_LC:
             band=sncosmo.Bandpass(transmission.atmosphere[filtre].wavelen,transmission.atmosphere[filtre].sb, name='LSST::'+filtre,wave_unit=u.nm)
             sncosmo.registry.register(band)
 
+        self.Plot_LC_Points(data=lcpoints,flux_name='flux')
+        self.Plot_LC(lcpoints,lc)
+        plt.show()
+        """
 
         for lc in tot_lc:
             if lc.meta['X1']==sn_id['X1'] and lc.meta['Color']==sn_id['Color'] and lc.meta['DayMax']==sn_id['DayMax']:
@@ -71,6 +87,7 @@ class Visu_LC:
                 break
 
         plt.show()
+        """
 
     def Plot_LC_Points(self,data=None, flux_name='flux',xfigsize=None, yfigsize=None, figtext=None,figtextsize=1.,ncol=2,color=None,cmap=None, cmap_lims=(3000., 10000.),zp=25., zpsys='ab',):
        
@@ -196,13 +213,14 @@ class Visu_LC:
         errors['x1']=np.sqrt(sn['salt2.CovX1X1'])
         errors['c']=np.sqrt(sn['salt2.CovColorColor'])
         
+        print 'Phases : first',(lc['time'][0]-sn['salt2.T0'])/(1.+sn['z']),'last',(lc['time'][-1]-sn['salt2.T0'])/(1.+sn['z'])
         """
         res, fitted_modelb = sncosmo.fit_lc(lc, fitted_model,['t0', 'x0', 'x1', 'c'],bounds={'z':(sn['z']-0.001, sn['z']+0.001)})
 
         print 'ooo',res.errors
         print 'bbb',errors
         """
-        sncosmo.plot_lc(lc, model=fitted_model,pulls=True,errors=errors)
+        sncosmo.plot_lc(lc, model=fitted_model,pulls=True)
             
         plt.show()
 
@@ -212,7 +230,10 @@ parser.add_option("-i", "--fieldid", type="int", default=744, help="filter [%def
 parser.add_option("-x", "--stretch", type="float", default=0., help="filter [%default]")
 parser.add_option("-c", "--color", type="float", default=0., help="filter [%default]")
 parser.add_option("-d", "--dirmeas", type="string", default="DD", help="filter [%default]")
+parser.add_option("--T0step", type="float", default=0.2, help="filter [%default]")
 parser.add_option("--dirobs", type="string", default="DD", help="filter [%default]")
+parser.add_option("--DayMax", type="float", default=0.2, help="filter [%default]")
+parser.add_option("--z", type="float", default=0., help="filter [%default]")
 
 opts, args = parser.parse_args()
 
@@ -222,6 +243,9 @@ thedir=opts.dirmeas
 thedir_obs=opts.dirobs
 X1=opts.stretch
 Color=opts.color
-z=0.1
+z=opts.z
+T0step=opts.T0step
+DayMax=opts.DayMax
 
-Visu_LC(fieldname=fieldname,fieldid=fieldid,X1=0,Color=0.,z=z)
+prefix='/sps/lsst/data/dev/pgris/'
+Visu_LC(fieldname=fieldname,fieldid=fieldid,X1=X1,Color=Color,z=z,DayMax=DayMax,data_dir=prefix+'Fitted_Light_Curves_sncosmo_testb_'+str(T0step).replace('.','_')+'_b',lc_dir=prefix+'Light_Curves_sncosmo_testb_'+str(T0step).replace('.','_')+'_b')

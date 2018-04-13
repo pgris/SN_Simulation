@@ -174,18 +174,19 @@ Plot_NSN_vs_z(axc,survey_area,case,cumul=False)
 plt.show()
 
 
-"""
+z_range=[0.1,0.2,0.4,0.6,0.8,1.]
 rate_namec='Perrett'
 r=[]
 f = open('nsn.tex','w')
 f.write('\\begin{table}[ht]'+'\n')
 #f.write('\\begin{center}'+'\n')
 f.write('\\caption{Number of type Ia supernovae with ten years of observation and a field-of-view of 9.6 deg$^{2}}\label{tab:nsn}'+'\n')
-f.write('\\begin{tabular}{llllllllll}'+'\n')
+f.write('\\begin{tabular}{'+'l'*len(z_range)+'}'+'\n')
 f.write('\\hline'+'\n')
 
+
 chap='duration'
-for z in np.linspace(0.1,1.0,10):
+for z in z_range:
     chap+=' & z $\leq$ '+str(z)
 chap+=' \\\\'
 f.write(chap+'\n')
@@ -193,11 +194,11 @@ for duration in np.arange(130,210,10):
     thestr=str(duration)
     duration*=10 # for ten years of observations
     
-    for z in np.linspace(0.1,1.1,11):
+    for z in z_range:
         ratec=SN_Rate(rate=rate_namec,survey_area=survey_area,duration=duration/365.)
         nsn,err_nsn=ratec.N_SN(z)
         print duration,z,nsn,err_nsn
-        thestr+=' & '+str(int(nsn))+'$\pm$'+str(int(err_nsn))
+        thestr+=' & '+str(int(round(nsn)))+'$\pm$'+str(int(round(err_nsn)))
         r.append((duration,z,nsn,err_nsn))
     thestr+=' \\\\'
     f.write(thestr+'\n')
@@ -209,6 +210,6 @@ f.write('\\end{table}'+'\n')
 
 f.close()
 
-res=np.rec.fromrecords(r,names=['duration','z','sns','err_nsn'])
-"""
+#res=np.rec.fromrecords(r,names=['duration','z','sns','err_nsn'])
+
     

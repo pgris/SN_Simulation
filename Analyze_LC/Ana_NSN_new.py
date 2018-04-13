@@ -153,12 +153,13 @@ def Plot_Field(fieldid,tot_nsn,rtot=[]):
    
 
 fieldname='DD'
-#fieldids=[744,1427,2412,2786]
-fieldids=[100,101,102,103]
-#fieldids=[1427]
+fieldids=[744,1427,2412,2786]
+#fieldids=[100,101,102,103]
+fieldids=[744]
 simu_name='sncosmo'
 #selection=dict(zip(['N_SN_sncosmo_Science_Book_no_colorcut','N_SN_sncosmo_Science_Book_with_colorcut','N_SN_sncosmo_Sela_no_color_cut','N_SN_sncosmo_Sela_with_color_cut'],['Science_Book','Science_Book_with_colorcut','Sela','Sela_with_color_cut']))
-selection_names=['Sela','Sela_cc','Selb_10_2','Selb_10_2_cc']
+#selection_names=['Sela','Sela_cc','Selb_10_2','Selb_10_2_cc']
+selection_names=['Sela_cc','Sela_cc_tot','Sela_cc_tot_oldcut']
 tot_nsn={}
 for selname in selection_names:
    tot_nsn[selname]=Read_File(fieldname,fieldids,thedir='N_SN_'+simu_name+'_'+selname+'/')

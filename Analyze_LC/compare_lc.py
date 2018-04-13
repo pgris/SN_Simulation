@@ -1,214 +1,168 @@
 import numpy as np
-from LC_Ana import *
-from optparse import OptionParser
-from ID import *
-import cPickle as pkl
+import h5py
+from astropy.table import Table,vstack
+import sncosmo
 import matplotlib.pyplot as plt
-from scipy.spatial import distance
+from Telescope import *
+from astropy import (cosmology, units as u, constants as const)
 
-def Index_nearest(lca,lcb):
-    
-    points=[(lcb[i].meta['DayMax'],lcb[i].meta['X1'],lcb[i].meta['Color']) for i in range(len(lcb))]
-    idx_nearest=distance.cdist([(lca.meta['DayMax'],lca.meta['X1'],lca.meta['Color'])],points).argmin()
+#bands='ugrizy'
+bands='g'
 
-    return idx_nearest
+def Read_Fitted(fi):
+    tot_data=None
+    
+    f = h5py.File(fi,'r')
+    for i,keyb in enumerate(f.keys()):
+        tab=Table.read(fi, path=keyb)
+        if tot_data is None:
+            tot_data=tab
+        else:
+            tot_data=vstack([tot_data,tab])
 
-def Plot(var,vara,varb,varc,name):
-    nrow=3
-    ncol=2
-    fig, axes = plt.subplots(nrow, ncol, figsize=(10,9))
-    fontsize=12
+    return tot_data
+
+def Get_Index(list_lc, simu_name, what):
+
+    for i,lca in enumerate(list_lc[simu_name]):
+        #print(lca.meta)
+        if lca.meta[what] == val[what]:
+            return i
+
+    return -1
+
+def Read_LC(fi):
     
-    bands=dict(zip(['00','01','10','11','20','21'],['g','r','i','z','y','None']))
-    
-    for axnum in range(ncol * nrow):
-        row = axnum // ncol
-        col = axnum % ncol
-        ax = axes[row, col]
-        band=bands[str(row)+str(col)]
-        print 'yes',row,col,band
-        idx = (res['band'] == band)&(res['time']>2.)
-        sel = res[idx]
-        if len(sel) > 0:
-            ll=vara+'/'+varb
-            ax.hist(sel[var+'_'+vara]/sel[var+'_'+varb],histtype='step',label=ll,normed=True,stacked=True,bins=15)
-            if varc is not None:
-                ll=vara+'/'+varc
-                ax.hist(sel[var+'_'+vara]/sel[var+'_'+varc],histtype='step',label=ll,normed=True,stacked=True,bins=15)
-                ll=varc+'/'+varb
-                ax.hist(sel[var+'_'+varc]/sel[var+'_'+varb],histtype='step',label=ll,normed=True,stacked=True,bins=15)
-            ax.set_ylabel('Number of Entries')
-            ax.set_xlabel(name)
+    f = h5py.File(fi,'r')
+    nlc=len(f.keys())
+
+    r=[]
+    for j in range(nlc):
+        r.append(Table.read(fi, path='lc_'+str(j)))
+
+    return r
+
+def Plot_LC(lc,sn):
+
+     dust = sncosmo.OD94Dust()
+     fitted_model=sncosmo.Model(source='salt2-extended', effects=[dust, dust],
+                                effect_names=['host', 'mw'],
+                                effect_frames=['rest', 'obs'])
+     fitted_model.set(z=sn['z'])
+     fitted_model.set(t0=sn['salt2.T0'])
+     fitted_model.set(x0=sn['salt2.X0'])
+     fitted_model.set(x1=sn['salt2.X1'])
+     fitted_model.set(c=sn['salt2.Color']) 
+     
+     errors={}
+     errors['t0']=np.sqrt(sn['salt2.CovT0T0'])
+     errors['x0']=np.sqrt(sn['salt2.CovX0X0'])
+     errors['x1']=np.sqrt(sn['salt2.CovX1X1'])
+     errors['c']=np.sqrt(sn['salt2.CovColorColor'])
+     
+     print 'Phases : first',(lc['time'][0]-sn['salt2.T0'])/(1.+sn['z']),'last',(lc['time'][-1]-sn['salt2.T0'])/(1.+sn['z'])
+     """
+     res, fitted_modelb = sncosmo.fit_lc(lc, fitted_model,['t0', 'x0', 'x1', 'c'],bounds={'z':(sn['z']-0.001, sn['z']+0.001)})
+     
+     print 'ooo',res.errors
+     print 'bbb',errors
+     """
+     sncosmo.plot_lc(lc, model=fitted_model,pulls=True)
+     
+def Get_Ratios(lca,lcb,t0=0,z=0):
+
+    #print(lca.dtype)
+    #print(lca['time'],lcb['time'],lca['band'])
+    r=[]
+    for band in bands:
+        idxa = lca['band']=='LSST::'+band
+        sela= lca[idxa]
+        idxb = lcb['band']=='LSST::'+band
+        selb= lcb[idxb]
+        #print(band,sela['time'],selb['time'])
+        for i in range(len(sela)):
             
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-            ax.text(xlim[0]+0.95*(xlim[1]-xlim[0]),ylim[0]+0.92*(ylim[1]-ylim[0]),band)
-            if row == 0 and col == 0:
-                ax.legend(loc='upper left',prop={'size':fontsize},frameon=False)
+            idxc = np.abs(selb['time']-sela[i]['time'])<1.e-6
+            selc=selb[idxc]
+            if len(selc) ==1:
+                print(i,sela[i]['time'],np.asscalar(selc['time'])-sela[i]['time'])
+                #print('hello',len(sela[i]),len(selc),len(sela))
+                r.append((band,sela[i]['time'],sela[i]['flux']/np.asscalar(selc['flux']),sela[i]['fluxerr']/np.asscalar(selc['fluxerr']),(sela[i]['time']-t0)/(1.+z)))
+        
+    return r
 
-def Plot_vs(vara,varb,varc,name):
-    nrow=3
-    ncol=2
-    fig, axes = plt.subplots(nrow, ncol, figsize=(10,9))
-    
-    bands=dict(zip(['00','01','10','11','20','21'],['g','r','i','z','y','None']))
-    
-    for axnum in range(ncol * nrow):
-        row = axnum // ncol
-        col = axnum % ncol
-        ax = axes[row, col]
-        band=bands[str(row)+str(col)]
-        print 'yes',row,col,band
-        idx = (res['band'] == band)&(res['time']>2.)
-        sel = res[idx]
-        if len(sel) > 0:
-            ax.plot(sel[varc],sel[vara]/sel[varb],'k.')
-            ax.set_ylabel(name)
-            ax.set_xlabel(varc)
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-            #print 'h',0.98*xlim[1],1.1*ylim[0]
-            ax.text(xlim[0]+0.95*(xlim[1]-xlim[0]),ylim[0]+0.1*(ylim[1]-ylim[0]),band)
 
-parser = OptionParser()
+fieldname='DD'
+fieldid=744
+season=2
+x1=0.0
+color=0.0
+z=0.375
 
-parser.add_option("-f", "--fieldname", type="string", default='DD', help="filter [%default]")
-parser.add_option("-i", "--fieldid", type="int", default=744, help="filter [%default]")
-parser.add_option("-x", "--stretch", type="float", default=-999., help="filter [%default]")
-parser.add_option("-c", "--color", type="float", default=-999., help="filter [%default]")
-parser.add_option("-d", "--dirmeas", type="string", default="DD", help="filter [%default]")
-parser.add_option("--dirobs", type="string", default="DD", help="filter [%default]")
+simu_name=['sncosmo','snsim']
 
-opts, args = parser.parse_args()
+dirfiles_fitted='/sps/lsst/data/dev/pgris/Fitted_Light_Curves_'
+dirfiles_lc='/sps/lsst/data/dev/pgris/Light_Curves_'
+prefix='_0_5_m20.0_60.0'
 
-dict_data={}
+dirname=fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/z_'+str(z)
+fichname=fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(x1)+'_C_'+str(color)+'.hdf5'
 
-fieldid=opts.fieldid
-fieldname=opts.fieldname
-thedir=opts.dirmeas
-thedir_obs=opts.dirobs
-X1=opts.stretch
-Color=opts.color
+lc_fitted={}
+list_lc={}
 
-for seas in [0]:
-    dict_data['DD_'+str(fieldid)+'_'+str(seas+1)]=Id(thedir=thedir,thedir_obs=thedir_obs,fieldname=fieldname,fieldid=fieldid,X1=X1,Color=Color,season=seas,colorfig='k')
+telescope=Telescope(airmass=np.median(1.2))
 
-#LC_Ana(dict_data,zmin=0.01,zmax=1.,bin_z=0.02)
+transmission=telescope.throughputs
 
-z=0.5
+print(transmission.atmosphere.keys())
+for filtre in 'ugrizy':
+    band=sncosmo.Bandpass(transmission.atmosphere[filtre].wavelen,transmission.atmosphere[filtre].sb, name='LSST::'+filtre,wave_unit=u.nm)
+    sncosmo.registry.register(band)
 
-filename=fieldname+'/'+str(fieldid)+'/Season_0/'+fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_2.0_C_-0.2_0_949.pkl'
 
-print filename
-lc_sncosmo=pkl.load(open('../../Light_Curves_sncosmo_test/'+filename,'rb'))
-lc_snsim=pkl.load(open('../../Light_Curves_snsim_new/'+filename,'rb'))
-#lc_snsim_psf_gauss=pkl.load(open('../../Light_Curves_snsim_new/'+filename,'rb'))
 
-print len(lc_sncosmo),len(lc_snsim)
+for simu in simu_name:
+    lc_fitted[simu]=Read_Fitted(dirfiles_fitted+simu+prefix+'/'+dirname+'/'+fichname)
+    list_lc[simu]=Read_LC(dirfiles_lc+simu+prefix+'/'+dirname+'/'+fichname)
 
-"""
-fig, ax = plt.subplots(2, 2, figsize=(10,9))
-
-ax[0][0].hist([lc_snsim[i].meta['DayMax'] for i in range(len(lc_snsim))])
-ax[0][0].hist([lc_sncosmo[i].meta['DayMax'] for i in range(len(lc_sncosmo))])
-
-ax[0][1].hist([lc_snsim[i].meta['z'] for i in range(len(lc_snsim))])
-ax[0][1].hist([lc_sncosmo[i].meta['z'] for i in range(len(lc_sncosmo))])
-
-ax[1][0].hist([lc_snsim[i].meta['X1'] for i in range(len(lc_snsim))])
-ax[1][0].hist([lc_sncosmo[i].meta['X1'] for i in range(len(lc_sncosmo))])
-
-ax[1][1].hist([lc_snsim[i].meta['Color'] for i in range(len(lc_snsim))])
-ax[1][1].hist([lc_sncosmo[i].meta['Color'] for i in range(len(lc_sncosmo))])
-
-plt.show()
-"""
-
+for simu in simu_name:
+    print(simu,len(lc_fitted[simu]),len(list_lc[simu]))
+ 
 r=[]
-for i in range(len(lc_sncosmo)):
-    lc_cos=lc_sncosmo[i]
+for val in lc_fitted['sncosmo']:
+    idx = lc_fitted['snsim']['DayMax']==val['DayMax']
+    valb= lc_fitted['snsim'][idx]
+    print(val,valb)
+    #now try to grab light curves ...
+    ia=Get_Index(list_lc,'sncosmo','DayMax')
+    ib=Get_Index(list_lc,'snsim','DayMax')
+    print(ia,ib,val.dtype)
+    
+   
+    r+=Get_Ratios(list_lc['sncosmo'][ia],list_lc['snsim'][ia],t0=val['DayMax'],z=val['z'])
+    #Plot_LC(list_lc['sncosmo'][ia],val)
+    #Plot_LC(list_lc['snsim'][ia],valb)
 
-    idx_nearest=Index_nearest(lc_cos,lc_snsim)
-    #idx_nearestb=Index_nearest(lc_cos,lc_snsim_psf_gauss)
-
-    lc_sim=lc_snsim[idx_nearest]
-    #lc_sim_b=lc_snsim_psf_gauss[idx_nearestb]
-
-    #print 'oh yes',idx_nearest,idx_nearestb
-    diff={}
-    vals=['DayMax','X1','Color','z']
-    for val in vals:
-        diff[val]=lc_snsim[idx_nearest].meta[val]-lc_cos.meta[val]
-        #print val,diff[val]
-
-    pb=False
-    for band in 'grizy':
-        idx = lc_cos['band']=='LSST::'+band
-        lc_cosf=lc_cos[idx]
-        idx = lc_sim['band']=='LSST::'+band
-        lc_simf=lc_sim[idx]
-        """
-        idxb = lc_sim_b['band']=='LSST::'+band
-        lc_simfb=lc_sim_b[idxb]
-        """
-        """
-        if band == 'y':
-            print len(lc_cosf),len(lc_simf),len(lc_simfb)
-        """
-        for i, val in enumerate(lc_cosf):
-            idf=lc_simf['time']==val['time']
-            lc_simff=lc_simf[idf]
-            #idfb=lc_simfb['time']==val['time']
-            #lc_simffb=lc_simfb[idfb]
-            """
-            snr_sncosmo=val['flux']/val['fluxerr']
-            snr_snsim=lc_simff['flux_e_sec'][0]/lc_simff['err_flux_e_sec'][0]
-            snr_snsim_psf_gauss=lc_simffb['flux_e_sec'][0]/lc_simffb['err_flux_e_sec'][0]
-            """
-            snr_sncosmo=0
-            snr_snsim=0
-            snr_snsim_psf_gauss=0
-            #print lc_simff['flux_e_sec'][0]
-            #print len(lc_simffb),len(lc_cosf),len(lc_simff)
-            #if len(lc_simffb) > 0:
-            #r.append((band,lc_cos.meta['DayMax'],lc_cos.meta['X1'],lc_cos.meta['Color'],lc_cos.meta['z'],diff['DayMax'],diff['X1'],diff['Color'],diff['z'],val['flux_e_sec'],lc_simff['flux_e_sec'][0],val['flux_e_sec']*val['fluxerr']/val['flux'],lc_simff['err_flux_e_sec'][0],val['time']-np.min(lc_cosf['time']),lc_simffb['flux_e_sec'][0],lc_simffb['err_flux_e_sec'][0],snr_sncosmo,snr_snsim,snr_snsim_psf_gauss))
-            r.append((band,lc_cos.meta['DayMax'],lc_cos.meta['X1'],lc_cos.meta['Color'],lc_cos.meta['z'],diff['DayMax'],diff['X1'],diff['Color'],diff['z'],val['flux_e_sec'],lc_simff['flux_e_sec'][0],val['flux_e_sec']*val['fluxerr']/val['flux'],lc_simff['err_flux_e_sec'][0],val['time']-np.min(lc_cosf['time'])))
-          
     #break
+res=np.rec.fromrecords(r,names=['band','time','flux_ratio','flux_err_ratio','phase'])
 
+#print(res)
+
+
+for band in bands:
+    fig, ax = plt.subplots(1,2)
+    idf= res['band']==band
+    sel=res[idf]
     """
-    if pb is True:
-            figb, axb = plt.subplots(1, 2, figsize=(10,9))
-            axb[0].plot(lc_cosf['time']-np.min(lc_cosf['time']),lc_cosf['flux_e_sec'],'ko')
-            axb[0].plot(lc_simf['time']-np.min(lc_simf['time']),lc_simf['flux_e_sec'],'ro')
-            axb[1].plot(lc_cosf['time'],lc_cosf['flux_e_sec']/lc_simf['flux_e_sec'],'ko')
-            print lc_simf['time'],lc_cosf['time'],lc_cosf['flux_e_sec'],lc_simf['flux_e_sec']
-            plt.show()
+    ax[0].hist(sel['flux_ratio'],histtype='step',bins=20)
+    ax[1].hist(sel['flux_err_ratio'],histtype='step',bins=20)
+   
+    ax[0].plot(sel['phase'],sel['flux_ratio'],'k.')
+    ax[1].plot(sel['phase'],sel['flux_err_ratio'],'k.')
     """
-    """
-    fig, axes = plt.subplots(ncols=1, nrows=1, figsize=(10,9))
-
-    axes.plot(lc_cos['time'],lc_cos['flux_e_sec'],'bo')
-    axes.plot(lc_sim['time'],lc_sim['flux_e_sec'],'ko')
-
-    print 100.*(lc_cos['flux_e_sec']-lc_sim['flux_e_sec'])/lc_cos['flux_e_sec']
-    plt.show()
-    """
-    #print r
-    #break
-
-#res=np.rec.fromrecords(r,names=['band','DayMax','X1','Color','z','diff_DayMax','diff_X1','diff_Color','diff_z','flux_sncosmo','flux_snsim','err_flux_sncosmo','err_flux_snsim','time','flux_snsim_gain','err_flux_snsim_gain','snr_sncosmo','snr_snsim','snr_snsim_gain'])
-res=np.rec.fromrecords(r,names=['band','DayMax','X1','Color','z','diff_DayMax','diff_X1','diff_Color','diff_z','flux_sncosmo','flux_snsim','err_flux_sncosmo','err_flux_snsim','time','flux_snsim_gain'])
-
-
-#print res
-
-Plot('flux','sncosmo','snsim',varc=None,name='flux ratio')
-Plot('err_flux','sncosmo','snsim',varc=None,name='errflux ratio')
-Plot_vs('flux_sncosmo','flux_snsim','time','flux$^{sncosmo}$/flux$^{snsim}$')
-Plot_vs('err_flux_sncosmo','err_flux_snsim','time','errflux$^{sncosmo}$/errflux$^{snsim}$')
+    ax[0].plot(sel['time'],sel['flux_ratio'],'k.')
+    ax[1].plot(sel['time'],sel['flux_err_ratio'],'k.')
+    
 
 plt.show()
-
-
-   
