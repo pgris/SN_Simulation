@@ -5,9 +5,11 @@ import cPickle as pkl
 
 def Save_npz(name,x1_mean,sig_m_x1,sig_p_x1,c_mean,sig_m_c,sig_p_c,min_x1,max_x1,min_c,max_c,x1_step,c_step):
 
-    x1_vals, x1_weights = gauss_asym_distrib(x1_mean,sig_m_x1,sig_p_x1,x1_step,min_x1,max_x1)
-    c_vals, c_weights = gauss_asym_distrib(c_mean,sig_m_c,sig_p_c,c_step,min_c,max_c)
+    x1_vals, x1_weights = gauss_asym_distrib(x1_mean,sig_m_x1,sig_p_x1,x1_step,min_x1,max_x1+x1_step)
+    c_vals, c_weights = gauss_asym_distrib(c_mean,sig_m_c,sig_p_c,c_step,min_c,max_c+c_step)
     
+    #print x1_vals, x1_weights
+
     fichname='Dist_X1_Color_'+name
     np.savez(fichname,x1_vals=x1_vals, x1_weights=x1_weights,c_vals=c_vals, c_weights=c_weights)
 
@@ -30,16 +32,40 @@ def gauss_asym_distrib(mean,sigma_minus,sigma_plus,pas,min_val,max_val):
             res=np.exp(-np.power(x-mean,2)/(2*np.power(sigma_minus,2.)))
         else:
             res=np.exp(-np.power(x-mean,2)/(2*np.power(sigma_plus,2.)))
-        if res>0.001:
-            xvals.append(x)
-            weights.append(res)
+        #if res>0.0000001:
+        xvals.append(x)
+        weights.append(res)
 
+    print 'alors',xvals
     return xvals,weights/np.sum(weights)
+
+def Gime_Numbers(filename):
+
+    X1_Color_npzfile = np.load(filename,'r')
+
+    n_x1=len(X1_Color_npzfile['x1_vals'])
+    n_color=len(X1_Color_npzfile['c_vals']) 
+
+    thestr='N_x1 = '+str(n_x1)+' N_col = '+str(n_color)
+    return thestr
 
 def Show_Results(filename):
 
     X1_Color_npzfile = np.load(filename,'r')
     
+    print 'alors',filename
+    ftxt = open(filename.replace('.npz','.txt'),"w")
+    ftxt.write('# x1 c weight_x1 weight_c weight_tot\n')
+    for i in range(len(X1_Color_npzfile['x1_vals'])):
+        x1=X1_Color_npzfile['x1_vals'][i]
+        weight_x1=X1_Color_npzfile['x1_weights'][i]
+        for j in range(len(X1_Color_npzfile['c_vals'])):
+            c=X1_Color_npzfile['c_vals'][j]
+            weight_c=X1_Color_npzfile['c_weights'][j]
+            #print x1,c,weight_x1,weight_c,weight_x1*weight_c
+            ftxt.write(str(x1)+' '+str(c)+' '+str(weight_x1)+' '+str(weight_c)+' '+str(weight_x1*weight_c)+ '\n')
+    ftxt.close()
+
     thetype='low_z '
     if 'high_z' in filename:
         thetype='high_z'
@@ -103,8 +129,15 @@ c_mean=-0.099
 sig_m_c=0.003
 sig_p_c=0.119
 
-Save_npz('high_z',x1_mean=0.964,sig_m_x1=1.467,sig_p_x1=0.235,c_mean=-0.099,sig_m_c=0.003,sig_p_c=0.119,min_x1=-2.0,max_x1=2.0,min_c=-0.2,max_c=0.2,x1_step=0.1,c_step=0.01)
-Save_npz('low_z',x1_mean=0.419,sig_m_x1=3.024,sig_p_x1=0.742,c_mean=-0.069,sig_m_c=0.003,sig_p_c=0.148,min_x1=-6.0,max_x1=2.0,min_c=-0.2,max_c=0.3,x1_step=0.2,c_step=0.01)
+#Save_npz('high_z',x1_mean=0.964,sig_m_x1=1.467,sig_p_x1=0.235,c_mean=-0.099,sig_m_c=0.003,sig_p_c=0.119,min_x1=-2.0,max_x1=2.0,min_c=-0.2,max_c=0.2,x1_step=0.1,c_step=0.01)
+#Save_npz('low_z',x1_mean=0.419,sig_m_x1=3.024,sig_p_x1=0.742,c_mean=-0.069,sig_m_c=0.003,sig_p_c=0.148,min_x1=-6.0,max_x1=2.0,min_c=-0.2,max_c=0.3,x1_step=0.2,c_step=0.01)
+
+Save_npz('high_z',x1_mean=0.964,sig_m_x1=1.467,sig_p_x1=0.235,c_mean=-0.099,sig_m_c=0.003,sig_p_c=0.119,min_x1=-2.0,max_x1=2.0,min_c=-0.2,max_c=0.2,x1_step=0.2,c_step=0.02)
+Save_npz('low_z',x1_mean=0.419,sig_m_x1=3.024,sig_p_x1=0.742,c_mean=-0.069,sig_m_c=0.003,sig_p_c=0.148,min_x1=-6.0,max_x1=2.0,min_c=-0.2,max_c=0.3,x1_step=0.4,c_step=0.02)
+
+print 'low z',Gime_Numbers('Dist_X1_Color_low_z.npz')
+print 'high z',Gime_Numbers('Dist_X1_Color_high_z.npz')
+
 
 tab_low=Show_Results('Dist_X1_Color_low_z.npz')
 tab_high=Show_Results('Dist_X1_Color_high_z.npz')
@@ -115,7 +148,7 @@ tab_high=np.reshape(tab_high,(len(tab_high),1))
 print tab_low.shape,tab_high.shape
 """
 tab_tot=np.concatenate((tab_low,tab_high))
-pkl_file = open('Map_X1_C.pkl','wb')
+pkl_file = open('Map_X1_C_b.pkl','wb')
 pkl.dump(tab_tot, pkl_file)
 pkl_file.close()
 

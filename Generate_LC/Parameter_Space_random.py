@@ -74,9 +74,9 @@ print(len(r))
 params=np.rec.fromrecords(r,names=['fieldname','fieldid','season','z','T0step','x1','c','weight_x1','weight_c','dirmeas','dirout','sntype','Opsimlog','DayMax'])
 
 print(params['z'])
-np.save('prod_lc_'+simul_name+'_random_'+str(fieldid)+'_season_0.npy',params)
+np.save('prod_lc_'+simul_name+'_random_'+str(fieldid)+'_test.npy',params)
 
-"""
+
 figb, axb = plt.subplots(2, 2, figsize=(10,9))
 idx = params['z'] < 0.1
 idxb = params['z'] >= 0.1
@@ -85,7 +85,7 @@ axb[0][1].hist(params[idx]['c'],histtype='step',color='k')
 axb[1][0].hist(params[idxb]['x1'],histtype='step',color='k')
 axb[1][1].hist(params[idxb]['c'],histtype='step',color='k')
 plt.show()
-"""
+
 
 """
 figb, axb = plt.subplots(ncols=2, nrows=2, figsize=(10,9))

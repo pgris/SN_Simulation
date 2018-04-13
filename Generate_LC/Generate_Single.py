@@ -22,10 +22,15 @@ class Generate_Single_LC:
         """
         mean_restframe_wavelength = np.asarray([telescope.throughputs.mean_wavelength[obser['band'][-1]]/ (1. + z) for obser in obs])
 
-        #print mean_restframe_wavelength
+        """
+        for band in 'ugrizy':
+            print(band,telescope.throughputs.mean_wavelength[band])
+        print(mean_restframe_wavelength,[telescope.throughputs.mean_wavelength[obser['band'][-1]] for obser in obs])
+        """
         #print (mean_restframe_wavelength>blue_cutoff) & (mean_restframe_wavelength<red_cutoff)
         p=(obs['mjd']-T0)/(1.+z)
         idx = (p >= min_rf_phase)&(p<=max_rf_phase)&(mean_restframe_wavelength>blue_cutoff) & (mean_restframe_wavelength<red_cutoff)
+        #idx = (p >= min_rf_phase)&(p<=max_rf_phase)
         #print 'before',len(obs)
         obs=obs[idx]
         #print 'after',len(obs),np.sort(obs,order='band')
