@@ -7,15 +7,27 @@ from optparse import OptionParser
 #from SN_Utils import *
 import sncosmo
 import h5py
-from astropy.table import Table
+from astropy.table import Table,vstack
 
 def Dump_in_File(name,fit_lc):
-    
+
+    val_tot=None
+
     for key, val in fit_lc.items():
-        if not os.path.isfile(name):
-            val.write(name, path='fit_'+str(key), compression=True)
+        if val_tot is None:
+            val_tot=val
         else:
-            val.write(name,path='fit_'+str(key), append=True,compression=True)
+            val_tot=vstack([val_tot,val])
+
+    print('dumping in ',name)
+    if not os.path.isfile(name):
+        val_tot.write(name, path='fit_1', compression=True)
+    else:
+        f = h5py.File(name,'r')
+        key_num=len(f.keys())
+        print 'hello',key_num
+        f.close()
+        val_tot.write(name,path='fit_'+str(key_num+1), append=True,compression=True)
     
 
 parser = OptionParser()
@@ -27,11 +39,12 @@ parser.add_option("-c", "--color", type="float", default=-0.2, help="filter [%de
 parser.add_option("-d", "--dirmeas", type="string", default="None", help="filter [%default]")
 #parser.add_option("--numfile", type="int", default=0, help="filter [%default]")
 parser.add_option("-s", "--season", type="int", default=-1, help="filter [%default]")
-parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
-parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
+#parser.add_option("--T0min", type="int", default=0, help="filter [%default]")
+#parser.add_option("--T0max", type="int", default=10, help="filter [%default]")
 parser.add_option("-t", "--sntype", type="string", default='Ia', help="filter [%default]")
 parser.add_option("--dirout", type="string", default='Fitted_Light_Curves', help="filter [%default]")
 parser.add_option("--multiproc", type="string", default='yes', help="filter [%default]")
+parser.add_option("--DayMax", type="float", default=-1., help="filter [%default]")
 
 opts, args = parser.parse_args()
 
@@ -42,19 +55,26 @@ season=opts.season
 stretch=opts.stretch
 color=opts.color
 dirmeas=opts.dirmeas
+DayMax=opts.DayMax
 #numfile=opts.numfile
-T0min=opts.T0min
-T0max=opts.T0max
+#T0min=opts.T0min
+#T0max=opts.T0max
 sntype=opts.sntype
 main_dir_in='/sps/lsst/data/dev/pgris/'
-dir_in=main_dir_in+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)
+dir_in=main_dir_in+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/z_'+str(z)
 filename=fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)
-filename+='_'+str(T0min)+'_'+str(T0max)+'.hdf5'
+if DayMax > 0.:
+    filename+='_DayMax_'+str(DayMax)
+#filename+='_'+str(T0min)+'_'+str(T0max)+'.hdf5'
+filename+='.hdf5'
 thefile=dir_in+'/'+filename
 dirout=opts.dirout
 multiproc=opts.multiproc
+DayMax=opts.DayMax
 
 dir_out=dir_in.replace(dirmeas,dirout)
+
+print 'Processing',filename
 
 """
 if z < 1:
@@ -96,6 +116,7 @@ for filtre in 'ugrizy':
 nlc=len(f.keys())
 
 n_multi=8
+#n_multi=1
 n_batch=nlc/n_multi
 
 #n_batch=10
@@ -113,15 +134,14 @@ if multiproc == 'yes':
     num_tot=0
     
     batch=np.arange(0,nlc,n_multi)
-    print type(batch)
-    if (nlc%n_multi) > 0:
-        batch=np.append(batch,nlc)
-    print batch,nlc%n_multi
+    batch=np.append(batch,nlc)
+
+    print(batch,nlc%n_multi)
 
     for i in range(len(batch)-1):
         result_queue = multiprocessing.Queue()
         if (i%10) == 0:
-            print 'Fitting',i
+            print('Fitting',i,n_multi)
            
         ida=batch[i]
         idb=batch[i+1]
@@ -147,8 +167,8 @@ if multiproc == 'yes':
         for j in range(ida,idb):
             fitted_lc[j]=resultdict[j]
 
-        if num_tot > 0 and (num_tot%100)==0:
-            print 'Dumping',num_tot
+        if i> 0 and (i%80)==0:
+            print 'Dumping',num_tot,i
             Dump_in_File(name_out,fitted_lc)
             fitted_lc={}
 
@@ -162,13 +182,14 @@ if multiproc == 'yes':
 else:
     
     #for i,lc in enumerate(list_lc):
-    
+
+    fitted_lc={}
     for i,key in enumerate(f.keys()):
         lc=Table.read(thefile, path=key)
-        if (i%100) == 0:
-            print 'Fitting',i
+        
+        print('Fitting',i,len(lc))
         #time_begin=time.time()
-        fitted_lc=Fit_Single_LC(lc,telescope,-1).Summary()
+        fitted_lc[key]=Fit_Single_LC(lc,telescope,-1).Summary()
         #print 'total elapse time fit',time.time()-time_begin
         """
         if fit_stack is None:
@@ -177,6 +198,7 @@ else:
         else:
             fit_stack=vstack([fit_stack,fitted_lc])
         """
+        """
         if not os.path.isfile(name_out):
              fitted_lc.write(name_out, path=key.replace('lc','fit'), compression=True)
         else:
@@ -184,7 +206,11 @@ else:
         
         if i >=50:
             break
+        """
     
+        #if (i%500)==0:
+         #   Dump_in_File(name_out,fitted_lc)
+
     #break
 #print 'total elapse time',time.time()-time_begin
 """

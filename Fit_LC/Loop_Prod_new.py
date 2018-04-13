@@ -21,9 +21,9 @@ def batch(tab,inum,multiproc='yes'):
     log = dirLog + '/'+name_id+'.log'
 
     if multiproc == 'yes':
-        qsub = "qsub -P P_lsst -l sps=1,ct=30:00:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
+        qsub = "qsub -P P_lsst -l os=sl6,sps=1,ct=30:00:00,h_vmem=16G -j y -o "+ log + " -pe multicores 8 <<EOF"
     else:
-        qsub = "qsub -P P_lsst -l sps=1,ct=30:00:00,h_vmem=16G -j y -o "+ log + " <<EOF"
+        qsub = "qsub -P P_lsst -l os=sl6,sps=1,ct=30:00:00,h_vmem=16G -j y -o "+ log + " <<EOF"
 
 
     scriptName = dirScript+'/'+name_id+'.sh'

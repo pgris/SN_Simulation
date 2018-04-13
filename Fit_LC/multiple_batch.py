@@ -23,7 +23,7 @@ def batch(tab, ibatch,simu_name,multiproc):
     T0min=tab['T0min'][0]
     T0max=tab['T0max'][0]
 
-    name_id=fieldname+'_'+str(fieldid)+'_season_'+str(opts.season)+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)+'_'+str(ibatch)+'_'+simu_name
+    name_id=fieldname+'_'+str(fieldid)+'_season_'+str(opts.season)+'_z_'+str(tab['z'][0])+'_x1_'+str(stretch)+'_c_'+str(color)+'_T0min_'+str(T0min)+'_T0max_'+str(T0max)+'_'+str(ibatch)+'_'+simu_name
     log = dirLog + '/'+name_id+'.log'
 
     if multiproc == 'yes':
@@ -70,7 +70,6 @@ parser.add_option("--multiproc", type="string", default='yes', help="filter [%de
 
 opts, args = parser.parse_args()
 
-
 fieldname=opts.fieldname
 fieldid=opts.fieldid
 season=opts.season
@@ -87,11 +86,17 @@ multiproc=opts.multiproc
 
 main_dir_in='/sps/lsst/data/dev/pgris/'
 if z == -1.0:
-    files=glob.glob(main_dir_in++dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_*_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
+    what=main_dir_in+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/z_'+str(z)+'/'+fieldname+'_'+str(fieldid)+'_*_X1_'+str(stretch)+'_C_'+str(color)+'*.hdf5'
 else:
-    files=glob.glob(main_dir_in+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/'+fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)+'*.pkl')
+    if stretch == -999.0 and color == -999.0 :
+        what=main_dir_in+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/z_'+str(z)+'/'+fieldname+'_'+str(fieldid)+'_'+str(z)+'_*.hdf5'
+    
+    else:
+        what=main_dir_in+dirmeas+'/'+fieldname+'/'+str(fieldid)+'/Season_'+str(season)+'/z_'+str(z)+'/'+fieldname+'_'+str(fieldid)+'_'+str(z)+'_X1_'+str(stretch)+'_C_'+str(color)+'_*.hdf5' 
 
-
+print 'looking for',what
+files=glob.glob(what)
+print 'hello',files,len(files)
 r=[]
 
 for fi in files:
@@ -114,7 +119,7 @@ for fi in files:
     r.append((dirmeas,fieldname,fieldid,z,season,stretch,color,sntype,T0min,T0max,dirout))
 
 params= np.rec.fromrecords(r,names=['dirmeas','fieldname','fieldid','z','season','X1','Color','sntype','T0min','T0max','dirout'])
-print len(params)
+print 'nparams',len(params)
 
 
 
@@ -122,12 +127,15 @@ nbatches=len(params)/nfiles_per_batch
 if len(params)%nfiles_per_batch > 0:
     nbatches+=1
 
+print 'Number of batches',z,len(params),nfiles_per_batch,nbatches
+
 for i in range(nbatches):
     imin=i*nfiles_per_batch
     imax=imin+nfiles_per_batch
     if imax >= len(params):
-        imax=len(params)
-    batch(params[imin:imax],i,simu_name,multiproc)
+        batch(params[imin:],i,simu_name,multiproc)
+    else:
+        batch(params[imin:imax],i,simu_name,multiproc)
 
 """
 cmd='python batch.py --z '+str(z)+' --fieldname '+fieldname+' --fieldid '+str(fieldid)+' --season '+str(season)+' --sntype '+sntype+' --stretch '+str(stretch)+' --color '+str(color)+' --dirmeas '+dirmeas+' --T0min '+str(T0min)+' --T0max '+str(T0max)
