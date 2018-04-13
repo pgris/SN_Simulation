@@ -16,8 +16,8 @@ class SN_Rate:
         self.min_rf_phase=min_rf_phase
         self.max_rf_phase=max_rf_phase
 
-    def __call__(self,zmin=0.1,zmax=0.2,dz=0.01,bins=None,account_for_edges=False):
-        
+    def __call__(self,zmin=0.1,zmax=0.2,dz=0.01,bins=None,account_for_edges=False,duration_z=None):
+
         if bins is None:
             thebins = np.arange(zmin, zmax+dz, dz)
             zz = 0.5 * (thebins[1:] + thebins[:-1])
@@ -25,34 +25,47 @@ class SN_Rate:
         else:
             zz=bins
             thebins=bins
-            print thebins
-            thebins=np.append(thebins,thebins[len(bins)-1]+(bins[1]-bins[0]))
+            
+            #print 'sn rate the bins before',thebins
+            """
+            if old_way:
+                thebins=np.append(thebins,thebins[len(bins)-1]+(bins[1]-bins[0]))
+                if duration_z is not None:
+                    duration_z=np.append(duration_z,duration_z[-1])
+            """
+                #print('sn rate the bins after',len(thebins),len(duration_z),thebins)
 
         rate, err_rate = self.sn_rate(thebins)
         error_rel=err_rate/rate
                 
         area = self.survey_area / STERADIAN2SQDEG # or area= self.survey_area/41253.
-    
-        dvol = norm*self.astropy_cosmo.comoving_volume(thebins).value
-        #print 'after rate',len(zz),len(rate),len(dvol),area,rate
+        thebinsb=list(thebins)
+        
+        
+        thebinsb+=[thebinsb[len(thebinsb)-1]+(thebinsb[1]-thebinsb[0])]
+        
+        dvol = norm*self.astropy_cosmo.comoving_volume(thebinsb).value
+        #print('after rate',len(zz),len(rate),len(dvol),area,rate)
 
-        #dvol = dvol[1:] - dvol[:-1]
         
-        #print 'hello',len(zz),len(dvol)
-        
+        dvol = dvol[1:] - dvol[:-1]
+
         if account_for_edges:
             margin = (1.+zz) * (self.max_rf_phase-self.min_rf_phase) / 365.25
             effective_duration = self.duration - margin
             effective_duration[effective_duration<=0.] = 0.
         else:
             effective_duration = self.duration
+            if duration_z is not None:
+                #print('hello',duration_z,zz)
+                effective_duration=duration_z(zz)/365.25 #duration in days !
 
-        nsn=rate * area * dvol * effective_duration / (1.+thebins)
-        err_nsn=err_rate* area * dvol * effective_duration / (1.+thebins)
-        nsn = nsn[1:] - nsn[:-1]
-        #err_nsn= np.sqrt(err_nsn[1:]**2 + err_nsn[:-1]**2)
-        #err_nsn= [np.sqrt(vala**2+valb**2) for vala,valb in zip(err_nsn[1:],err_nsn[:-1])]
-        err_nsn=np.sqrt(err_nsn[1:]**2+err_nsn[:-1]**2-2.*err_nsn[1:]*err_nsn[:-1])
+        normz=(1.+thebins)
+        nsn=rate *area * dvol * effective_duration / normz
+        err_nsn=err_rate*area * dvol * effective_duration / normz
+       
+        
+        #print('ici sn rate',rate,area,dvol,effective_duration,thebins,nsn)
         #err_nsn=nsn * error_rel[1:]
         return zz,rate, err_rate,nsn, err_nsn
         

@@ -1,19 +1,23 @@
 import numpy as np
 
 class Observations:
-    def __init__(self,fieldid,ra=-1,dec=-1,filename='',nseasons=10):
+    def __init__(self,fieldid,ra=-1,dec=-1,filename='',nseasons=10,season_length=95,names=['mjd','Ra','Dec']):
 
         self.fieldid=fieldid
+        self.mjd=names[0]
+        self.ra=names[1]
+        self.dec=names[2]
 
         if filename != '':
             data=self.Load(filename)
+            #print(data.dtype)
             #data=np.sort(data,order='mjd')
-            data.sort(order='mjd')
+            data.sort(order=self.mjd)
             self.all_seasons=data
-            self.seasons=self.Get_Seasons(data)
+            self.seasons=self.Get_Seasons(data,season_length)
             self.Remove_Poor_Seasons()
-            self.Ra=np.unique(data['Ra'])[0]
-            self.Dec=np.unique(data['Dec'])[0]
+            self.Ra=np.unique(data[self.ra])[0]
+            self.Dec=np.unique(data[self.dec])[0]
         else:
             self.Ra=ra
             self.Dec=dec
@@ -41,14 +45,14 @@ class Observations:
                 r.append(tuple(tofill))
         return np.rec.fromrecords(r,names=varname)
             
-    def Get_Seasons(self,data,season_length=95):
+    def Get_Seasons(self,data,season_length):
         
-        thediff=data['mjd'][1:]-data['mjd'][:-1]
+        thediff=data[self.mjd][1:]-data[self.mjd][:-1]
         idx,=np.where(thediff > season_length)
         lidx=[val+1 for val in list(idx)]
         
         lidx.insert(0,0)
-        lidx.append(len(data['mjd']))
+        lidx.append(len(data[self.mjd]))
         #print 'ay',lidx
         
         seasons={}

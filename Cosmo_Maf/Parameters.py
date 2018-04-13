@@ -16,6 +16,8 @@ import numpy as np
 
 class parameters:
     def __init__(self):
+        bands='ugrizy'
+
         self.kAtm = {'u': 0.50,
                      'g': 0.21,
                      'r': 0.13,
@@ -44,7 +46,11 @@ class parameters:
                              'i':0.05,
                              'z':0.03,
                              'y':0.02}
+
+        self.m5={'u':23.61,'g':24.83,'r':24.35,'i':23.88,'z':23.30,'y':22.43}
         
+        self.seeing=dict(zip(bands,[0.92,0.87,0.83,0.80,0.78,0.76]))
+
         
        #FWHM_500 = seeing at 500 nm
        # FWHM_Sys_Zenith = sqrt(telSeeing**2 + opticalDesSeeing**2 + cameraSeeing**2)

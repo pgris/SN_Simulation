@@ -65,19 +65,27 @@ class Fit_LC:
         #print 'what I have to fit',len(select)
         try:
             #print 'trying to fit',len(select)
-            res, fitted_model = sncosmo.fit_lc(select, self.SN_fit_model,['t0', 'x0', 'x1', 'c'],bounds={'z':(self.z-0.001, self.z+0.001)})
+            fit_status='notok'
+            if len(select) > 0:
+                res, fitted_model = sncosmo.fit_lc(select, self.SN_fit_model,['t0', 'x0', 'x1', 'c'],bounds={'z':(self.z-0.001, self.z+0.001)})
             #print 'total elapse time fit',time.time()-time_begin
             #self.sigma_c=res['errors']['c']
-            mbfit=fitted_model._source.peakmag('bessellb','vega')
+                mbfit=fitted_model._source.peakmag('bessellb','vega')
             #mbfit=0.
-            params={}
+                params={}
             #print res
-            for i,par in enumerate(fitted_model.param_names):
-                params[par]=fitted_model.parameters[i]
-                #print par
+                for i,par in enumerate(fitted_model.param_names):
+                    params[par]=fitted_model.parameters[i]
+                #print(i,par)
             #snutils=SN_Utils()
             #mbfit_calc=snutils.mB(params)
             #print 'total elapse time mbfit',time.time()-time_begin,mbfit
+                fit_status='fitok'
+            else:
+                res=None
+                fitted_model=None
+                mbfit=-1
+                fit_status='nodat'
             """
             
             
@@ -120,7 +128,7 @@ class Fit_LC:
                 plt.show()
             #print 'total elapse time',time.time()-time_begin
             #return res,fitted_model,mbfit,covar_mb,'ok'
-            return res,fitted_model,mbfit,'ok'   
+            return res,fitted_model,mbfit,fit_status   
 
         except (RuntimeError, TypeError, NameError):
                 """

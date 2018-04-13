@@ -37,6 +37,11 @@ class Throughputs(object):
         
         if atmos:
             self.Load_Atmosphere()
+        else:
+            for f in self.filterlist:  
+                self.lsst_atmos[f]= self.lsst_system[f]
+                self.lsst_atmos_aerosol[f]=self.lsst_system[f]
+
         self.lsst_telescope={}
         
         self.Load_Telescope()
@@ -197,6 +202,7 @@ class Throughputs(object):
             t = Table.read(thedir+names[band],format='ascii')
             print band,np.min(t['col1']),np.max(t['col1']),np.mean(np.max(t['col1'])-np.min(t['col1']))
         """
+        #print('hello',self.lsst_atmos.keys())
         if 'g' in self.filterlist:
             for band in self.filterlist:
                 self.mean_wavelength[band]=np.sum(self.lsst_atmos[band].wavelen*self.lsst_atmos[band].sb)/np.sum(self.lsst_atmos[band].sb)

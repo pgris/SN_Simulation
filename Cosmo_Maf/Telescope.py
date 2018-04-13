@@ -176,3 +176,10 @@ class Telescope(object):
 
     def zero_points(self, band):
         return np.asarray([self.zp[b] for b in band])
+
+    def mag_to_flux_e_sec(self,mag,band,trans,sed):
+
+        #this should be debugged at some point
+        e_per_sec = sed.calcADU(bandpass=trans, photParams=self.photParams)
+        e_per_sec/=exptime/self.photParams.gain
+        return e_per_sec

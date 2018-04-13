@@ -66,7 +66,7 @@ class SN_Utils:
 #    I1=np.sum((splM0(xs)*10**-12+res.parameters[3]*splM1(xs)*10**-12)*(10**(-0.4*salt2source.colorlaw(xs)*res.parameters[4]))*xs*splB(xs)*dxs)
         I1 = np.sum((self.splM0(self.xs)*10**-12+params['x1']*self.splM1(self.xs)*10**-12)*(10**(-0.4*self.color_law_salt2(self.xs)*params['c']))*self.xs*self.splB(self.xs)*self.dxs)    
         I2 = np.sum(self.splref(self.xs)*self.xs*self.splB(self.xs)*self.dxs)
-        #print I1, I2   
+        #print(I1, I2,params['x1'],params['c'])   
     
     #computation of mb
         mref = 9.907
@@ -138,17 +138,22 @@ class SN_Utils:
     def Covar(self,params,covar,vparam_names):
 
         res={}
-        h=1.e-6
+        h_ref=1.e-8
         Der=np.zeros(shape=(len(vparam_names),1))
 
         #print params
         par_var=params.copy()
         ider=-1
         for i,key in enumerate(vparam_names):
+            h=h_ref
+            if np.abs(par_var[key]) < 1.e-5:
+                h=1.e-10
+
             par_var[key]+=h
             ider+=1
+            #print(par_var,params)
             Der[ider]=(self.mB(par_var)-self.mB(params))/h
-            print 'there man',key,params[key],Der[ider]
+            #print 'there man',key,params[key],Der[ider]
             par_var[key]-=h
 
         Prod=np.dot(covar,Der)
@@ -160,6 +165,7 @@ class SN_Utils:
                res['salt2.CovColormb']=Prod[i,0] 
 
         res['salt2.Covmbmb']=np.asscalar(np.dot(Der.T,Prod))
+        res['mb_recalc']=self.mB(par_var)
 
         return res
         

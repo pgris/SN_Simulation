@@ -91,7 +91,7 @@ class Generate_LC:
             self.dL=lumidist
         #X0_snsim = self.X0_norm_snsim() / lumidist** 2
             X0= self.X0_norm()/ lumidist** 2
-            print 'before alpha beta',X0
+            #print 'before alpha beta',X0
             alpha=0.13
             beta=3.
             X0 *= np.power(10., 0.4*(alpha*self.param['X1'] -beta*self.param['Color']))
@@ -217,13 +217,37 @@ class Generate_LC:
         #time_begin=time.time()
 
         table_obs=Table(obs)
+        snr_m5=[]
+        e_per_sec_list=[]
+        for i in range(len(SED_time.wavelen)):
+            photParams=PhotometricParameters(nexp=table_obs['exptime'][i]/15.)
+            flux_SN=fluxes[i]
+            if flux_SN > 0:
+                trans=self.transmission.atmosphere[table_obs['band'][i][-1]]
+                mag_SN=-2.5 * np.log10(flux_SN / 3631.0)  
+                snr_m5_opsim,gamma_opsim=SignalToNoise.calcSNR_m5(mag_SN,trans,table_obs['m5sigmadepth'][i],photParams)
+                err_flux_SN=flux_SN/snr_m5_opsim
+                e_per_sec = seds[i].calcADU(bandpass=trans, photParams=photParams) #number of ADU counts for expTime
+                    #e_per_sec = sed.calcADU(bandpass=self.transmission.lsst_atmos[filtre], photParams=photParams)
+                #print 'alors',e_per_sec,expTime[i],photParams.gain
+                e_per_sec/=table_obs['exptime'][i]/photParams.gain
+                #print('hello',mag_SN,flux_SN,e_per_sec,snr_m5_opsim)
+                snr_m5.append(snr_m5_opsim)
+                e_per_sec_list.append(e_per_sec)
+                #print fluxes,mags
+            else:
+                snr_m5.append(1)
+                e_per_sec_list.append(1)
+
+        #print('passed')
+        
         table_obs.add_column(Column(fluxes, name='flux'))
-        idx = table_obs['flux'] > 0.
+        table_obs.add_column(Column(snr_m5, name='snr_m5'))
+        table_obs.add_column(Column(e_per_sec_list, name='flux_e'))
+        idx = table_obs['flux'] >= 0.
         table_obs=table_obs[idx]
-
+        """
         mags=-2.5 * np.log10(table_obs['flux'] / 3631.0)
-        #print fluxes,mags
-
         def snr(bands,mags,sky,seeing,expTime,ron):
             pixel_scale=0.2
             mag_sky=dict(zip('ugrizy',[22.95,22.24,21.20,20.47,19.60,18.63]))
@@ -234,20 +258,48 @@ class Generate_LC:
             flux_sky=self.telescope.mag_to_flux(sky,[band[-1] for band in bands])*expTime
             #res=flux_e/np.sqrt((flux_sky*pixel_scale**2+ron**2)*neff)
             res=flux_e/np.sqrt(flux_e+(flux_sky*pixel_scale**2+ron**2)*neff)
-            return res
+            #for i in range(len(mags)):
+            #print mags[i],flux_e[i],res[i]
+            return res,flux_e/expTime
 
-        snrs=snr(table_obs['band'],mags,table_obs['sky'],table_obs['seeing'],table_obs['exptime'],5.)
-
-        table_obs.add_column(Column(table_obs['flux']/snrs, name='fluxerr'))
+        snrs,flux_e=snr(table_obs['band'],mags,table_obs['sky'],table_obs['seeing'],table_obs['exptime'],5.)
+        print('ici',flux_e,snrs)
+        """
+        table_obs.add_column(Column(table_obs['flux']/table_obs['snr_m5'], name='fluxerr'))
+        #table_obs.add_column(Column(flux_e, name='flux_e'))
+        #table_obs.add_column(Column(flux_e/snrs, name='flux_e_err'))
+        table_obs.add_column(Column(table_obs['flux_e']/table_obs['snr_m5'], name='flux_e_err'))
         table_obs.add_column(Column([2.5*np.log10(3631)]*len(table_obs),name='zp'))
         table_obs.add_column(Column(['ab']*len(table_obs),name='zpsys'))
-        table_obs.add_column(Column(self.telescope.mag_to_flux(mags,[band[-1] for band in table_obs['band']]),name='flux_e_sec'))
-        table_obs.add_column(Column(self.telescope.mag_to_flux(obs['m5sigmadepth'],[band[-1] for band in table_obs['band']]),'flux_5sigma_e_sec'))
+        #table_obs.add_column(Column(self.telescope.mag_to_flux(mags,[band[-1] for band in table_obs['band']]),name='flux_e_sec'))
+        #table_obs.add_column(Column(self.telescope.mag_to_flux(obs['m5sigmadepth'],[band[-1] for band in table_obs['band']]),'flux_5sigma_e_sec'))
         table_obs['band'][:]=np.array([b.replace('LSSTPG','LSST') for b in table_obs['band']])
 
         table_obs.rename_column('mjd','time')
         table_obs.rename_column('m5sigmadepth','m5')
-        
+         
+        for colname in ['exptime','rawSeeing','seeing','moon_frac','sky','kAtm','airmass','m5','Nexp','Ra','Dec']:
+            if colname in table_obs.colnames:
+                table_obs.remove_column(colname)
+
+        #print(table_obs[['flux_e','snr_m5']])
+        """
+        table_obs.remove_column('exptime')
+        table_obs.remove_column('rawSeeing')
+        table_obs.remove_column('seeing')
+        table_obs.remove_column('moon_frac')
+        table_obs.remove_column('sky')
+        table_obs.remove_column('kAtm')
+        table_obs.remove_column('airmass')
+        table_obs.remove_column('m5')
+        table_obs.remove_column('Nexp')
+        table_obs.remove_column('Ra')
+        table_obs.remove_column('Dec')
+        """
+        #table_obs.remove_column('flux_e_sec')
+        #table_obs.remove_column('flux_5sigma_e_sec')
+    
+
         #print len(table_obs)
         #print table_obs
         #print len(table_obs),table_obs.dtype
@@ -362,7 +414,7 @@ class Generate_LC:
         zp=2.5*np.log10(flux)+mag
         flux_at_10pc = np.power(10., -0.4 * (self.peakAbsMagBesselB-zp))
         
-        print 'zp',zp,flux_at_10pc
+        #print 'zp',zp,flux_at_10pc
 
         source=sncosmo.get_source(self.model,version=self.version)
         SN=sncosmo.Model(source=source)
