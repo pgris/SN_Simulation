@@ -2,98 +2,22 @@ from Generate_LC import Generate_LC
 from Telescope import *
 import multiprocessing
 from Parameters import parameters
-import pylab as pl
+import pylab as plt
 import glob
 from Observations import *
-import multiprocessing
 import os 
+from mpl_toolkits.basemap import Basemap
+from optparse import OptionParser
+from croaks import NTuple
+from pycosmo.cosmo import CosmoLambda
+from saunerie import salt2, snsim, psf
 
-def f5_cadence_lims_sncosmo(SNR=dict(zip([b for b in "griz"], 
-                                 [30., 40., 30., 20.])),
-                    zs=[0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1],
-                    X1=-2., Color=0.2,
-                            expTime=dict(zip([b for b in "griz"], 
-                                               [30., 30., 30., 30.])),telescope=None):
-
-    bands=SNR.keys()
-    restframe_phase_range = (-20., 40.)	
-    pmin, pmax = restframe_phase_range
-    r=[]
-    lims={}
-    for z in zs:
-        r.append((z,-2.0,0.2,0.))
-
-    #params=np.rec.fromrecords(r, names = ['z', 'X1', 'Color', 'DayMax'])
-    params=np.rec.array(r, dtype=[('z', 'f8'),('X1', 'f8'), ('Color', 'f8'),('DayMax','f8')])
-    #print 'before',params['z']
-    cadence=1.
-    
-    #m5_lim={'u':23.61,'g':24.83,'r':24.35,'i':23.88,'z':23.30,'y':22.43}
-
-    #this m5_lim values correspond to an exposure time of 30s...needs to be corrected for DDF
-
-    obs_param=parameters()
-    m5_lim=obs_param.m5
-    for key, vals in expTime.items():
-        m5_lim[key]=m5_lim[key]+1.25*np.log10(vals/30.)
-
-    for param in params:
-        rb=[]
-        z=param['z']
-        lims[z]={}
-        mjd_min = np.floor(pmin * (1.+z) + param['DayMax'])
-        mjd_max = np.ceil(pmax * (1.+z) + param['DayMax'])
-        mjd = np.arange(mjd_min, mjd_max, cadence)
-        lc_sncosmo=Generate_LC(param,telescope=telescope)
-        #lc_sncosmo=Generate_LC(param,mjd,expTime).lc
-        #airmass_val=np.repeat(airmass, len(mjd), 0)
-       
-        for mjd_val in mjd:
-            for band in bands:
-                rb.append((mjd_val,band,obs_param.seeing[band],m5_lim[band],expTime[band],obs_param.msky[band],))
-        table_obs=np.rec.fromrecords(rb,names=['mjd','band','seeing','m5sigmadepth','exptime','sky'])
-        lc=lc_sncosmo(table_obs)
-        #print(table_obs['seeing'])
-        """
-        result_queue = multiprocessing.Queue()
-        process=[]
-        for b in bands:
-            expTime_val=np.repeat(expTime[b], len(mjd), 0)
-            m5_lim_val=np.repeat(m5_lim[b], len(mjd), 0)
-        #ret[b]=lc_sncosmo(mjd,b,expTime[b],result_queue)
-            p=multiprocessing.Process(name='Subprocess-'+b,target=lc_sncosmo,args=(mjd,airmass_val,m5_lim_val,b,expTime_val,result_queue))
-            process.append(p)
-            p.start()
-
-        resultdict = {}
-        for b in bands:
-            resultdict.update(result_queue.get())
-
-        for p in multiprocessing.active_children():
-            p.join()
-        """
-        print('redshift',z)
-        for filtre in bands:
-           
-            #res=resultdict[filtre][0]
-            idx=lc['band']==filtre
-            res=lc[idx]
-            #print('bou',filtre,res['flux_e']/res['flux_e_err'])
-            idx = res['flux_e']/res['flux_e_err'] > 5.
-            res=res[idx]
-            Li2=np.sqrt(np.sum(np.square(res['flux_e'])))
-            lim = 5. * Li2 / SNR[filtre]
-            #print(filtre,lim,Li2,SNR[filtre])
-            lims[z][filtre]=lim
-
-    return lims 
-
-def f5_cadence_plot(lsstpg, band, lims=None, median_log_summary=None, 
+def f5_cadence_plot_new(lsstpg, band, lims=None, median_log_summary=None, 
                     median_log_summaryb=None,dict_marker=None,
                     lims_sncosmo=None,
                     mag_range=(23., 26.5), 
                     dt_range=(0.5, 15.), 
-                    target={},targetb={},alpha=1.,simu_name=''):
+                    target={},targetb={},alpha=1.,simu_name='',thetype='all',seas=1,save_it=False):
     #                    SNR=dict(zip(['LSSTPG::' + b for b in 'grizy'], 
     #                                 [20., 20., 20., 20., 10.]))):
     
@@ -109,15 +33,143 @@ def f5_cadence_plot(lsstpg, band, lims=None, median_log_summary=None,
     sorted_keys=np.sort([k  for  k in  lims.keys()])[::-1]
 
     # draw limits 
-    pl.figure()
-    pl.imshow(metric, extent=(mag_range[0], mag_range[1], 
+    fig=plt.figure(figsize=(10,10))
+    grid = plt.GridSpec(4, 4, hspace=0.8, wspace=0.8)
+    main_ax = fig.add_subplot(grid[:-1, 1:])
+    y_hist = fig.add_subplot(grid[:-1, 0], xticklabels=[], sharey=main_ax)
+    x_hist = fig.add_subplot(grid[-1, 1:], yticklabels=[], sharex=main_ax)
+
+
+    main_ax.imshow(metric, extent=(mag_range[0], mag_range[1], 
                               dt_range[0], dt_range[1]), 
               aspect='auto', alpha=0.25)
     
     if median_log_summary is not None:
         idx = median_log_summary['band'] == band
         m = median_log_summary[idx]
-        pl.plot(m['m5'], m['cadence'], 'r+',alpha=alpha)
+        main_ax.plot(m['m5'], m['cadence'], 'r+',alpha=alpha)
+        m5_exp=np.median(m['m5'])
+
+        idxb = (median_log_summary['band'] == band)&(median_log_summary['cadence']<=30)
+        m = median_log_summary[idxb]
+        #print(len(m),m['cadence'])
+         # histogram on the attached axes
+        x_hist.hist(m['m5'], 40, histtype='step',
+                    orientation='vertical', color='red')
+    #x_hist.invert_yaxis()
+        
+        y_hist.hist(m['cadence'], 40, histtype='step',
+                    orientation='horizontal', color='blue')
+        y_hist.invert_xaxis()
+
+    
+        """
+        x_hist.set_xlabel('$m_{5\sigma}$', fontsize=18)
+        x_hist.set_ylabel('Number of Events', fontsize=18)
+        y_hist.set_xlabel('Observer frame cadence $^{-1}$ [days]', fontsize=16)
+        y_hist.set_ylabel('Number of Events', fontsize=18)
+        """
+
+        #print 'h1',band,np.median(m['m5'])
+        
+    if median_log_summaryb is not None:
+        """
+        idx = median_log_summaryb['band'] == band
+        m = median_log_summaryb[idx]
+        plt.plot(m['m5'], m['cadence'], 'b+',alpha=alpha)
+        m5_exp=np.median(m['m5'])
+        """
+        #print 'h2',band,np.median(m['m5'])
+        for key, val in median_log_summaryb.items():
+            idx = val['band'] == band
+            m = val[idx]
+            main_ax.plot(m['m5'], m['cadence'],dict_marker[key],alpha=alpha)
+            m5_exp=np.median(m['m5'])
+
+    cadence_ref=3
+    
+    if lims is not None:
+        fmt = {}
+        ll = [lims[zz][band] for zz in sorted_keys]
+        print('limits',ll)
+        cs = main_ax.contour(M5, DT, metric, ll, colors='k')
+        dict_target_snsim=Get_target(cs,sorted_keys,cadence_ref,m5_exp)
+
+        strs = ['$z=%3.1f$' % zz for zz in sorted_keys]
+        for l,s in zip(cs.levels, strs):
+            fmt[l] = s
+        main_ax.clabel(cs, inline=True, fmt=fmt, fontsize=16, use_clabeltext=True)
+    
+    
+    if lims_sncosmo is not None:
+        #llc = [lims_sncosmo[zz][band.split('::')[1]] for zz in sorted_keys]
+        llc = [lims_sncosmo[zz][band] for zz in sorted_keys]
+        b = [band]*len(llc)
+        print 'baba',band,llc,[zz for zz in sorted_keys],lsstpg.flux_to_mag(llc,b)
+        csc = main_ax.contour(M5, DT, metric, llc, colors='b') 
+        dict_target_sncosmo=Get_target(csc,sorted_keys,cadence_ref,m5_exp)
+
+        strs = ['$z=%3.1f$' % zz for zz in sorted_keys]
+        for l,s in zip(csc.levels, strs):
+            fmt[l] = s
+        main_ax.clabel(csc, inline=1, fmt=fmt, fontsize=16)
+
+    """
+    t = target.get(band, None)
+    print target, t
+
+    if t is not None:
+        main_ax.plot(t[0], t[1], 
+                color='r', marker='*', 
+                markersize=15)
+    """
+
+    main_ax.set_xlabel('$m_{5\sigma}$', fontsize=18)
+    main_ax.set_ylabel(r'Observer frame cadence $^{-1}$ [days]', fontsize=18)
+    main_ax.set_title('$%s$ - %s' % (band.split(':')[-1],simu_name), fontsize=18)
+    main_ax.set_xlim(mag_range)
+    main_ax.set_ylim(dt_range)
+    main_ax.grid(1)
+    if save_it: 
+        outdir='Plots_'+simu_name+'_'+thetype+'/Season_'+str(seas)
+        if seas == -1:
+            outdir='Plots_'+simu_name+'_'+thetype
+        Check_Dir(outdir)
+        plt.gcf().savefig(outdir+'/metric_'+band+'.png', bbox_inches='tight')
+
+
+    #plt.show()
+
+def f5_cadence_plot(lsstpg, band, lims=None, median_log_summary=None, 
+                    median_log_summaryb=None,dict_marker=None,
+                    lims_sncosmo=None,
+                    mag_range=(23., 26.5), 
+                    dt_range=(0.5, 15.), 
+                    target={},targetb={},alpha=1.,simu_name='',thetype='all',seas=1,save_it=False):
+    #                    SNR=dict(zip(['LSSTPG::' + b for b in 'grizy'], 
+    #                                 [20., 20., 20., 20., 10.]))):
+    
+    dt = np.linspace(dt_range[0], dt_range[1], 50)
+    m5 = np.linspace(mag_range[0], mag_range[1], 50)
+    b = [band] * len(m5)
+    f5 = lsstpg.mag_to_flux(m5, b)
+    
+    F5,DT = np.meshgrid(f5, dt)
+    M5,DT = np.meshgrid(m5, dt)
+    metric = np.sqrt(DT) * F5
+    #print('metric',metric)
+    sorted_keys=np.sort([k  for  k in  lims.keys()])[::-1]
+
+    # draw limits 
+    plt.figure()
+    plt.imshow(metric, extent=(mag_range[0], mag_range[1], 
+                              dt_range[0], dt_range[1]), 
+              aspect='auto', alpha=0.25)
+    
+    if median_log_summary is not None:
+        idx = median_log_summary['band'] == band
+        m = median_log_summary[idx]
+        plt.plot(m['m5'], m['cadence'], 'r+',alpha=alpha)
         m5_exp=np.median(m['m5'])
         #print 'h1',band,np.median(m['m5'])
         
@@ -125,42 +177,30 @@ def f5_cadence_plot(lsstpg, band, lims=None, median_log_summary=None,
         """
         idx = median_log_summaryb['band'] == band
         m = median_log_summaryb[idx]
-        pl.plot(m['m5'], m['cadence'], 'b+',alpha=alpha)
+        plt.plot(m['m5'], m['cadence'], 'b+',alpha=alpha)
         m5_exp=np.median(m['m5'])
         """
         #print 'h2',band,np.median(m['m5'])
         for key, val in median_log_summaryb.items():
             idx = val['band'] == band
             m = val[idx]
-            pl.plot(m['m5'], m['cadence'],dict_marker[key],alpha=alpha)
+            plt.plot(m['m5'], m['cadence'],dict_marker[key],alpha=alpha)
             m5_exp=np.median(m['m5'])
 
     """
-    if median_log_summaryc is not None:
-        idx = median_log_summaryc['band'] == band
-        m = median_log_summaryc[idx]
-        pl.plot(m['m5'], m['cadence'], 'rs',alpha=0.7)
-        #print 'h3',band,np.median(m['m5']),m['m5']
-
-    if median_log_summaryd is not None:
-        idx = median_log_summaryd['band'] == band
-        m = median_log_summaryd[idx]
-        pl.plot(m['m5'], m['cadence'], 'bs',alpha=0.7)
-        #print 'h4',band,np.median(m['m5'])
-     """
     cadence_ref=3
     
     if lims is not None:
         fmt = {}
         ll = [lims[zz][band] for zz in sorted_keys]
         print('limits',ll)
-        cs = pl.contour(M5, DT, metric, ll, colors='k')
+        cs = plt.contour(M5, DT, metric, ll, colors='k')
         dict_target_snsim=Get_target(cs,sorted_keys,cadence_ref,m5_exp)
 
         strs = ['$z=%3.1f$' % zz for zz in sorted_keys]
         for l,s in zip(cs.levels, strs):
             fmt[l] = s
-        pl.clabel(cs, inline=True, fmt=fmt, fontsize=16, use_clabeltext=True)
+        plt.clabel(cs, inline=True, fmt=fmt, fontsize=16, use_clabeltext=True)
     
     
     if lims_sncosmo is not None:
@@ -168,13 +208,57 @@ def f5_cadence_plot(lsstpg, band, lims=None, median_log_summary=None,
         llc = [lims_sncosmo[zz][band] for zz in sorted_keys]
         b = [band]*len(llc)
         print 'baba',band,llc,[zz for zz in sorted_keys],lsstpg.flux_to_mag(llc,b)
-        csc = pl.contour(M5, DT, metric, llc, colors='b') 
+        csc = plt.contour(M5, DT, metric, llc, colors='b') 
         dict_target_sncosmo=Get_target(csc,sorted_keys,cadence_ref,m5_exp)
 
         strs = ['$z=%3.1f$' % zz for zz in sorted_keys]
         for l,s in zip(csc.levels, strs):
             fmt[l] = s
-        pl.clabel(csc, inline=1, fmt=fmt, fontsize=16)
+        plt.clabel(csc, inline=1, fmt=fmt, fontsize=16)
+
+    """
+    print 'Band',band
+
+    """
+    if median_log_summaryc is not None:
+        idx = median_log_summaryc['band'] == band
+        m = median_log_summaryc[idx]
+        plt.plot(m['m5'], m['cadence'], 'rs',alpha=0.7)
+        #print 'h3',band,np.median(m['m5']),m['m5']
+
+    if median_log_summaryd is not None:
+        idx = median_log_summaryd['band'] == band
+        m = median_log_summaryd[idx]
+        plt.plot(m['m5'], m['cadence'], 'bs',alpha=0.7)
+        #print 'h4',band,np.median(m['m5'])
+     """
+    cadence_ref=3
+    
+    if lims is not None:
+        fmt = {}
+        ll = [lims[zz][band] for zz in sorted_keys]
+        print('limits snsim',ll)
+        cs = plt.contour(M5, DT, metric, ll, colors='k')
+        dict_target_snsim=Get_target(cs,sorted_keys,cadence_ref,m5_exp)
+
+        strs = ['$z=%3.1f$' % zz for zz in sorted_keys]
+        for l,s in zip(cs.levels, strs):
+            fmt[l] = s
+        plt.clabel(cs, inline=True, fmt=fmt, fontsize=16, use_clabeltext=True)
+        print('ici',cs.allsegs[0])
+    
+    if lims_sncosmo is not None:
+        llc = [lims_sncosmo[zz][band.split('::')[1]] for zz in sorted_keys]
+        #llc = [lims_sncosmo[zz][band] for zz in sorted_keys]
+        b = [band]*len(llc)
+        print 'limits sncosmo',band,llc,[zz for zz in sorted_keys],lsstpg.flux_to_mag(llc,b)
+        csc = plt.contour(M5, DT, metric, llc, colors='b') 
+        dict_target_sncosmo=Get_target(csc,sorted_keys,cadence_ref,m5_exp)
+        print('icib',csc.allsegs[0])
+        strs = ['$z=%3.1f$' % zz for zz in sorted_keys]
+        for l,s in zip(csc.levels, strs):
+            fmt[l] = s
+        plt.clabel(csc, inline=1, fmt=fmt, fontsize=16)
 
     print 'Band',band
     #ref_z=dict(zip([b for b in 'rizy'],[0.8,1.0,0.7,0.6]))
@@ -195,30 +279,36 @@ def f5_cadence_plot(lsstpg, band, lims=None, median_log_summary=None,
     print target, t
 
     if t is not None:
-        pl.plot(t[0], t[1], 
+        plt.plot(t[0], t[1], 
                 color='r', marker='*', 
                 markersize=15)
     
     """
-    pl.plot(snsim_target[1], cadence_ref, 
+    plt.plot(snsim_target[1], cadence_ref, 
                 color='r', marker='*', 
                 markersize=15)
     """
-    pl.xlabel('$m_{5\sigma}$', fontsize=18)
-    pl.ylabel(r'Observer frame cadence $^{-1}$ [days]', fontsize=18)
-    pl.title('$%s$ - %s' % (band.split(':')[-1],simu_name), fontsize=18)
-    pl.xlim(mag_range)
-    pl.ylim(dt_range)
-    pl.grid(1)
-    pl.gcf().savefig('Plots_'+simu_name+'/cadence_'+band+'.png', bbox_inches='tight')
+    plt.xlabel('$m_{5\sigma}$', fontsize=18)
+    plt.ylabel(r'Observer frame cadence $^{-1}$ [days]', fontsize=18)
+    plt.title('$%s$ - %s' % (band.split(':')[-1],simu_name), fontsize=18)
+    plt.xlim(mag_range)
+    plt.ylim(dt_range)
+    plt.grid(1)
+    if save_it: 
+        outdir='Plots_'+simu_name+'_'+thetype+'/Season_'+str(seas)
+        if seas == -1:
+            outdir='Plots_'+simu_name+'_'+thetype
+        Check_Dir(outdir)
+        plt.gcf().savefig(outdir+'/metric_'+band+'.png', bbox_inches='tight')
 
     if median_log_summary is not None:
         
-        figa, axa = pl.subplots(ncols=2, nrows=1,figsize=(15,9))
+        figa, axa = plt.subplots(ncols=2, nrows=1,figsize=(15,9))
         figa.suptitle('$%s$ - %s' % (band.split(':')[-1],simu_name), fontsize=18)
-        idx = (median_log_summary['band'] == band)&(median_log_summary['cadence']<=30)
+        print(len(median_log_summary),median_log_summary['cadence'])
+        idx = (median_log_summary['band'] == band.split('::')[-1])&(median_log_summary['cadence']<=30)
         m = median_log_summary[idx]
-        #print(len(m),m['cadence'])
+        print(len(m),m['cadence'])
         axa[0].hist(m['m5'],bins=20,histtype='step')
         axa[1].hist(m['cadence'],bins=range(int(np.min(m['cadence'])),int(np.max(m['cadence'])),1),histtype='step')
         axa[0].set_xlabel('$m_{5\sigma}$', fontsize=18)
@@ -229,8 +319,12 @@ def f5_cadence_plot(lsstpg, band, lims=None, median_log_summary=None,
         #m5_exp=np.median(m['m5'])
         
         #print 'h1',band,np.median(m['m5'])
-
-        pl.gcf().savefig('Plots_'+simu_name+'/histo_'+band+'.png', bbox_inches='tight')
+        if save_it: 
+            outdir='Plots_'+simu_name+'_'+thetype+'/Season_'+str(seas)
+            if seas == -1:
+                outdir='Plots_'+simu_name+'_'+thetype
+            Check_Dir(outdir)
+            plt.gcf().savefig(outdir+'/histo_'+band+'.png', bbox_inches='tight')
 
 
 def Get_target(cs,sorted_keys,cadence_ref,m5_exp):
@@ -258,28 +352,37 @@ def Median_log_summary(fi,bands,j,out_q=None):
     fieldid=(fi.split('/')[-1]).split('_')[1]
     fieldid=int(fieldid.split('.')[0])
         
-    obs=Observations(fieldid,filename=fi,season_length=365.,names=['observationStartMJD','fieldRA','fieldDec'])
+    obs=Observations(fieldid,filename=fi,season_length=120.,names=['observationStartMJD','fieldRA','fieldDec'])
         #print(fi,len(obs.seasons))
     for i in range(len(obs.seasons)):
         season=obs.seasons[i]
+        duration_tot=np.max(season['observationStartMJD'])-np.min(season['observationStartMJD'])
             #print(i,season)
         for band in bands:
             idx = season['filter']==band
             sel=season[idx]
-            if len(sel) >= 2:
+            if len(sel) >= 1:
                 m5=np.median(sel['fiveSigmaDepth'])
                 airmass=np.median(sel['airmass'])
                 sky=np.median(sel['skyBrightness'])
                 seeing=np.median(sel['finSeeing'])
                 moon=np.median(sel['moonPhase'])
+                moondist=np.median(sel['moonDistance'])
+                moonRA=np.median(sel['moonRA'])
+                moonDec=np.median(sel['moonDec'])
+                moonAlt=np.median(sel['moonAlt'])
+                moonAz=np.median(sel['moonAz'])
+                cloud=np.median(sel['cloud'])
                 cadence=np.median(sel['observationStartMJD'][1:]-sel['observationStartMJD'][:-1])
                 ra_sn=np.median(sel['RA_SN'])
                 dec_sn=np.median(sel['Dec_SN'])
-                r.append((fieldid,ra_sn,dec_sn,band,cadence,m5,airmass,sky,seeing,moon))
+                nvisits=np.median(sel['Nvisits'])
+                duration_band=np.max(sel['observationStartMJD'])-np.min(sel['observationStartMJD'])
+                r.append((fieldid,ra_sn,dec_sn,band,cadence,m5,airmass,sky,seeing,moon,nvisits,moondist,moonRA,moonDec,moonAlt,moonAz,cloud,duration_band,duration_tot))
                 
     res=None
     if len(r) > 0:
-        res=np.rec.fromrecords(r,names=['fieldid','RA_SN','Dec_SN','band','cadence','m5','airmass','skyBrightness','finSeeing','moonPhase'])
+        res=np.rec.fromrecords(r,names=['fieldid','RA_SN','Dec_SN','band','cadence','m5','airmass','skyBrightness','finSeeing','moonPhase','Nvisits','moonDistance','moonRA','moonDec','moonAlt','moonAz','cloud','seas_length_band','seas_length_all'])
     if out_q is not None:
         out_q.put({j : res})
     else:
@@ -321,12 +424,12 @@ def Median_log_summary_old(files,bands,j,out_q=None):
     else:
         return res      
 
-def MultiProc_Median_log_summary(files,bands,simu_name,nbatch=20):
+def MultiProc_Median_log_summary(files,season,bands,simu_name,thetype,nbatch=20):
 
     restot=None
     ivals=range(0,len(files),nbatch)
     ivals=np.append(ivals,len(files))
-    dirout='Summary_'+simu_name
+    dirout='Summary_'+simu_name+'_'+thetype+'/Season_'+str(season)
     if not os.path.isdir(dirout) :
         os.makedirs(dirout)
 
@@ -340,7 +443,7 @@ def MultiProc_Median_log_summary(files,bands,simu_name,nbatch=20):
         result_queue = multiprocessing.Queue()
         #print('processing',ia,ib)
         if ia > 0 and (ia%5000)==0:
-            print('Dump in file',i)
+            print('Dump in file',ia)
             ifich+=1
             np.save(dirout+'/Sum_'+str(ifich)+'.npy',restot)
             restot=None
@@ -369,23 +472,83 @@ def MultiProc_Median_log_summary(files,bands,simu_name,nbatch=20):
     if restot is not None:
         print('Dump in file final')
         ifich+=1
-        np.save(dirout+'Sum_'+str(ifich)+'.npy',restot)
+        np.save(dirout+'/Sum_'+str(ifich)+'.npy',restot)
     
     #return restot
         
  
-def Plot(med_log,bands,whata,whatb):
+def Plot(med_log,bands,season,whata,whatb,simu_name,thetype,saveplot=False):
+
+    if saveplot:
+        dirout='Plots_'+simu_name+'_'+thetype+'/Season_'+str(season)
+        if not os.path.isdir(dirout) :
+            os.makedirs(dirout)
 
     for band in bands:
         idxb=med_log['band']==band
         sel=med_log[idxb]
-        figa, axa = pl.subplots(ncols=1, nrows=1)
+        """
+        figa, axa = plt.subplots(ncols=1, nrows=1)
         figa.suptitle(band+' band')
-        axa.plot(sel[whata],sel[whatb],'b.')
+        axa.plot(sel[whata],sel[whatb],'k.')
         axa.set_xlabel(whata)
         axa.set_ylabel(whatb)
+        """
+        fig = plt.figure(figsize=(10, 10))
+        fig.suptitle('Season '+str(season)+' - '+band+' band')
+        grid = plt.GridSpec(4, 4, hspace=0.8, wspace=0.8)
+        main_ax = fig.add_subplot(grid[:-1, 1:])
+        y_hist = fig.add_subplot(grid[:-1, 0], xticklabels=[], sharey=main_ax)
+        x_hist = fig.add_subplot(grid[-1, 1:], yticklabels=[], sharex=main_ax)
+        
+        # scatter points on the main axes
+    #main_ax.plot(x, y, 'ok', markersize=3, alpha=0.2)
+        main_ax.plot(sel[whata],sel[whatb], 'ok', markersize=1.)
+        
+    # histogram on the attached axes
+        x_hist.hist(sel[whata], 40, histtype='step',
+                    orientation='vertical', color='red')
+    #x_hist.invert_yaxis()
+        
+        y_hist.hist(sel[whatb], 40, histtype='step',
+                    orientation='horizontal', color='blue')
+        y_hist.invert_xaxis()
+        
+        main_ax.set_xlabel(whata)
+        main_ax.set_ylabel(whatb)
+        if saveplot:
+            plt.gcf().savefig(dirout+'/'+whata+'_'+whatb+'_'+band+'.png', bbox_inches='tight')
 
-def Plot_Stat(med_log,bands,whata,simu_name):
+def Plot_Prof(med_log,bands,season,whata,whatb):
+
+    for band in bands:
+        idxb=med_log['band']==band
+        sel=med_log[idxb]
+        """
+        H, xedges, yedges = np.histogram2d(sel[whata],sel[whatb],bins=10,normed=True,range=[[np.min(sel[whata]),np.max(sel[whata])],[np.min(sel[whatb]),np.max(sel[whatb])]])
+        print(xedges,yedges)
+        """
+        fig, ax = plt.subplots(ncols=1, nrows=1)
+        fig.suptitle('Season '+str(season)+' - '+band+' band')
+        plt.hist2d(sel[whata],sel[whatb],bins=20)
+        plt.colorbar(fraction=0.02, pad=0.04)
+        ax.set_xlabel(whata)
+        ax.set_ylabel(whatb)
+        #ax = fig.add_subplot(111)
+        #im = plt.imshow(H, interpolation='nearest', origin='low',
+         #               extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]])
+        """
+        X, Y = np.meshgrid(xedges, yedges)
+        plt.pcolormesh(X, Y, H)
+        #im = plt.imshow(H, interpolation='nearest', origin='low',
+         #               extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]])
+        ax.set_xlim([np.min(xedges),np.max(xedges)])
+        ax.set_ylim([np.min(yedges),np.max(yedges)])
+        plt.colorbar(fraction=0.02, pad=0.04)
+        #ax.set_aspect('equal')
+       
+        """
+def Plot_Stat(med_log,bands,season,whata,simu_name,thetype):
 
     r=[]
     corresp_band=dict(zip([b for b in 'ugrizy'],[i for i in range(0,7)]))
@@ -407,7 +570,7 @@ def Plot_Stat(med_log,bands,whata,simu_name):
     res=np.rec.fromrecords(r, names = ['band','iband','cadence','frac','frac_upper'])
     dict_plot={}
     dict_plot['legend_colz']='Fraction of Events'
-    dict_plot['title']='Cadence vs band \n '+simu_name
+    dict_plot['title']='Cadence vs band - '+simu_name+'\n Season '+str(season)
     dict_plot['xt']=range(1,5)
     dict_plot['xticks']=['g','r','i','z']
     dict_plot['yt']=range(2,8)
@@ -416,6 +579,8 @@ def Plot_Stat(med_log,bands,whata,simu_name):
     dict_plot['ylims']=[1.5,7.5]
     dict_plot['simu_name']=simu_name
     dict_plot['save_name']='Cadence_Distrib'
+    dict_plot['season']=season
+    dict_plot['thetype']=thetype
 
     dict_plotn=dict_plot.copy()
     dict_plotn['yt']=range(2,8)
@@ -430,7 +595,7 @@ def Plot_Stat(med_log,bands,whata,simu_name):
     #Plot_Map(res,'iband','cadence','frac',width=0.5,legend_colz='Fraction of Events',title='Cadence vs band',xt=range(1,5),xticks=['g','r','i','z'],yt=range(2,7),yticks=['2 days','3 days','4 days','5 days',' >= 6 days' ],typesel='int',ylims=[1.5,6.5])
     Plot_Map(res,'iband','cadence','frac',width_x=0.5,width_y=0.5,dict_plot=dict_plot)
     Plot_Map(res,'iband','cadence','frac_upper',width_x=0.5,width_y=0.5,dict_plot=dict_plotn)
-    
+    """
     ra_step=10.
     dec_step=10.
     for band in bands:
@@ -438,7 +603,7 @@ def Plot_Stat(med_log,bands,whata,simu_name):
         idxb=med_log['band']==band
         sel=med_log[idxb]
        
-        #figa, axa = pl.subplots(ncols=1, nrows=1)
+        #figa, axa = plt.subplots(ncols=1, nrows=1)
         #axa.plot(sel['RA_SN'],sel['Dec_SN'],'ro')
         for ra in np.arange(np.min(sel['RA_SN']),np.max(sel['RA_SN'])+ra_step,ra_step):
             for dec in np.arange(np.min(sel['Dec_SN']),np.max(sel['Dec_SN'])+dec_step,dec_step):
@@ -457,10 +622,11 @@ def Plot_Stat(med_log,bands,whata,simu_name):
         dict_plotb['xlab']='RA [deg]'
         dict_plotb['ylab']='Dec [deg]'
         dict_plotb['simu_name']=simu_name
-        dict_plotb['save_name']='Control_'+band
+        #dict_plotb['save_name']='Control_'+band
         #print('band',band)
         Plot_Map_new(sel,'RA_SN','Dec_SN',width_x=ra_step,width_y=dec_step,dict_plot=dict_plotb)
         #break
+    """
     """
     x=[]
     y=[]
@@ -507,7 +673,7 @@ def Plot_Stat(med_log,bands,whata,simu_name):
     plt.title('Cadence vs band')
     """
     """
-        figa, axa = pl.subplots(ncols=1, nrows=1)
+        figa, axa = plt.subplots(ncols=1, nrows=1)
         figa.suptitle(band+' band')
         axa.plot(sel[whata],sel[whatb],'b.')
         axa.set_xlabel(whata)
@@ -574,8 +740,12 @@ def Plot_Map(res,xstr,ystr,norm,width_x,width_y,dict_plot={}):
         plt.xlabel(dict_plot['xlab'])
     if dict_plot.has_key('ylab'):
         plt.ylabel(dict_plot['ylab'])
-    if dict_plot.has_key('save_name'):    
-        pl.gcf().savefig('Plots_'+dict_plot['simu_name']+'/'+dict_plot['save_name']+'.png', bbox_inches='tight')
+    if dict_plot.has_key('save_name'):  
+        dirout='Plots_'+dict_plot['simu_name']+'_'+dict_plot['thetype']+'/Season_'+str(dict_plot['season'])
+        if not os.path.isdir(dirout) :
+            os.makedirs(dirout)
+  
+        plt.gcf().savefig(dirout+'/'+dict_plot['save_name']+'.png', bbox_inches='tight')
 
 def Plot_Map_new(data,xstr,ystr,width_x,width_y,dict_plot={}):
 
@@ -635,7 +805,7 @@ def Plot_Map_new(data,xstr,ystr,width_x,width_y,dict_plot={}):
     if 'ylab' in dict_plot.keys():
         plt.ylabel(dict_plot['ylab'])
     if dict_plot.has_key('save_name'):    
-        pl.gcf().savefig('Plots_'+dict_plot['simu_name']+'/'+dict_plot['save_name']+'.png', bbox_inches='tight')
+        plt.gcf().savefig('Plots_'+dict_plot['simu_name']+'/'+dict_plot['save_name']+'.png', bbox_inches='tight')
 
 def Plot_Map_old(res,xstr,ystr,norm,width,legend_colz,title='',xt=None,xticks=None,yt=None,yticks=None,typesel='int',xlims=None,ylims=None):
 
@@ -734,7 +904,62 @@ def Select_new(ramin,ramax,decmin,decmax,tab,xstr,ystr):
 
     return idx
 
+def Plot_Hist(what,extent,season,thetype,leg,legunit,savename=''):
+
+    fig=plt.figure()
+    fig.suptitle(leg+' - Season'+str(season)+'\n'+extent)
+    plt.hist(what,histtype='step',bins=20)
+    
+    plt.xlabel(legunit)
+    plt.ylabel('Number of Entries')
+
+    #plt.show()
+    if savename != '':
+        dirout='Plots_'+simu_name+'_'+thetype+'/Season_'+str(season)
+        Check_Dir(dirout)
+        plt.gcf().savefig(dirout+'/'+savename+'.png')
+    
+    
+
+def Plot_Moll(ra,dec,norm,extent,season,thetype,leg,legunit,savename=''):
+
+    fig=plt.figure()
+    lons=np.rad2deg(ra)
+    lats=np.rad2deg(dec)
+    lons=ra
+    lats=dec
+
+    m = Basemap(projection='moll',lon_0=180)
+    m.drawparallels(parallels,labels=[1,0,0,0],fontsize=10)
+    m.drawmeridians(meridians,labels=[0,1,1,0],fontsize=10)
+    for i in np.arange(len(meridians)):
+        plt.annotate(np.str(int(meridians[i]))+'$^o$',xy=m(meridians[i],30),xycoords='data')
+
+    x, y = m(lons,lats)
+    
+    m.scatter(x,y,c=norm,marker='s',s=20,edgecolor='none',cmap=plt.cm.jet)
+ 
+    """
+    lon_lsst = 30.242869444
+    lat_lsst = 70.740580556
+    x_lsst,y_lsst = m(lon_lsst, lat_lsst)
+    m.plot(x_lsst, y_lsst, 'r*', markersize=24)
+    """
+
+    if season >=0:
+        toprint='WFD fields - Season '+str(season)+' \n '+ extent+'\n '+leg
+    else:
+       toprint='WFD fields - All seasons \n '+ extent+'\n '+leg 
+    plt.annotate(toprint, xy=(0.30, 1.1), xycoords='axes fraction')
+    cbar=m.colorbar(location='bottom',pad="5%")
+    cbar.set_label(legunit)
+    if savename != '':
+        dirout='Plots_'+simu_name+'_'+thetype+'/Season_'+str(season)
+        Check_Dir(dirout)
+        plt.gcf().savefig(dirout+'/'+savename+'.png')
+
 def Plotb(med_log,bands):
+
     r=[]
 
     for val in np.unique(med_log['fieldid']):
@@ -759,66 +984,208 @@ def Plotb(med_log,bands):
     for ba in bands:
         for bb in bands:
             if bb != ba:
-               figa, axa = pl.subplots(ncols=1, nrows=1)
+               figa, axa = plt.subplots(ncols=1, nrows=1)
                idx = (res['cadence_'+ba]<=30.)&(res['cadence_'+bb]<=30.)&(res['cadence_'+ba]>0.)&(res['cadence_'+bb]>0.)
                sel=res[idx]
                axa.plot(sel['cadence_'+ba],sel['cadence_'+bb],'k.')
                axa.set_xlabel('cadence_'+ba)
                axa.set_ylabel('cadence_'+bb)
 
+def Check_Dir(dirout):
+    if not os.path.isdir(dirout) :
+        os.makedirs(dirout)
 
+parser = OptionParser()
+parser.add_option("--simu_name", type="string", default='alt_sched_rolling', help="filter [%default]")
+parser.add_option("--season", type="int", default=1, help="filter [%default]")
+parser.add_option("--type", type="string", default='all', help="filter [%default]")
 
-atmos=False
-instr=Telescope(atmos=atmos,aerosol=False,airmass=-1.)
-instrb=Telescope(atmos=True,aerosol=False,airmass=1.2)
+opts, args = parser.parse_args()
 
-zs=[0.1, 0.2, 0.3, 0.4, 0.5]
-SNR_sncosmo=dict(zip([b for b in "griz"],
-                     [30., 40., 30., 20.]))
-
-bands=SNR_sncosmo.keys()
-
-target={'g': (24.83, 3.), # 23.86
-        'r': (24.35, 3.), # 23.82
-        'i': (23.88, 3.), # 23.51
-        'z': (23.30, 3.)}
-
-lims_sncosmo = f5_cadence_lims_sncosmo(zs=zs, SNR=SNR_sncosmo,telescope=instr)
-lims_sncosmob = f5_cadence_lims_sncosmo(zs=zs, SNR=SNR_sncosmo,telescope=instrb)
-lims_sncosmob = None
-#                           bands=[instr_name + '::' + b for b in bands])
-
-simu_name='alt_sched_rolling'
-simu_name='alt_sched'
-opsim_dir='/pbs/throng/lsst/users/gris/Read_sqlite_python3/OpSimLogs_'+simu_name+'/WFD'
-opsim_files=glob.glob(opsim_dir+'/WFD_*.txt')
-
-#median_log_summary=Median_log_summary(opsim_files,bands)
+season=opts.season
+simu_name=opts.simu_name
+thetype=opts.type
 
 dump=False
+display=True
+
 if dump:
-    MultiProc_Median_log_summary(opsim_files,bands,simu_name)
+    bands='grizy'
+    opsim_dir='/pbs/throng/lsst/users/gris/Read_sqlite_python3/OpSimLogs_'+simu_name+'_'+thetype+'/WFD'
+    opsim_dir+='/Season_'+str(season)
+    opsim_files=glob.glob(opsim_dir+'/WFD_*.txt')
+    MultiProc_Median_log_summary(opsim_files,season,bands,simu_name,thetype)
 
-sum_files=glob.glob('Summary_'+simu_name+'/*.npy')
+if display:
 
-median_log_summary=None
-for fi in sum_files:
-    fich=np.load(fi)
-    if median_log_summary is None:
-        median_log_summary=fich
-    else:
-        median_log_summary=np.concatenate((median_log_summary,fich))
+    display_metric=True
+    Plots=False
+    
+    if display_metric:
+
+        atmos=False
+        instr_snsim=psf.find('LSSTPG')
+        instr=Telescope(atmos=atmos,aerosol=False,airmass=-1.)
+        instrb=Telescope(atmos=True,aerosol=False,airmass=1.2)
+        zs=[0.1, 0.2, 0.3, 0.4, 0.5]
+        SNR=dict(zip(['LSSTPG::' + b for b in "griz"],
+                                [30., 40., 30., 20.]))
+        SNR_sncosmo=dict(zip([b for b in "griz"],
+                             [30., 40., 30., 20.]))
         
+        bands=SNR.keys()
+    
+        target={'g': (24.83, 3.), # 23.86
+                'r': (24.35, 3.), # 23.82
+                'i': (23.88, 3.), # 23.51
+                'z': (23.30, 3.)}
+    
+        #lims_snsim = f5_cadence_lims(zs=zs, SNR=SNR)
+        #lims_sncosmo = f5_cadence_lims_sncosmo(zs=zs, SNR=SNR_sncosmo,telescope=instr)
+        
+        lims_snsim=np.load('f5_cadence_lims_snsim_noairmass.npy').item()
+        print('helli',type(lims_snsim))
+        lims_sncosmo=np.load('f5_cadence_lims_sncosmo_airmass_12.npy').item()
 
-for bn in bands:
-    f5_cadence_plot(instr, bn, # instr_name + '::' + bn,
-                    lims=lims_sncosmo,lims_sncosmo=lims_sncosmob, 
-                    mag_range=(21., 25.5),
-                    dt_range=(0.5, 30.),
-                    median_log_summary=median_log_summary,median_log_summaryb=None,
-                    target=target,alpha=0.1,simu_name=simu_name)
+        
+        metric_per_season=False
+        metric_all_season=True
 
-#Plot(median_log_summary,bands,'m5','moonPhase')
-Plot_Stat(median_log_summary,bands,'cadence',simu_name)
-pl.show()
+        if metric_per_season:
+            for seas in range(1,11):
+                sum_files=glob.glob('Summary_'+simu_name+'_'+thetype+'/Season_'+str(seas)+'/*.npy')
+                
+                median_log_summary=None
+                for fi in sum_files:
+                    fich=np.load(fi)
+                    if median_log_summary is None:
+                        median_log_summary=fich
+                    else:
+                        median_log_summary=np.concatenate((median_log_summary,fich))
+
+                print(median_log_summary.dtype)
+
+                for bn in bands:
+                    f5_cadence_plot_new(instr, bn, # instr_name + '::' + bn,
+                                    lims=lims_snsim,lims_snsim=lims_sncosmo, 
+                                    mag_range=(21., 25.5),
+                                    dt_range=(0.5, 30.),
+                                    median_log_summary=median_log_summary,median_log_summaryb=None,
+                                    target=target,alpha=0.1,simu_name=simu_name,thetype=thetype,seas=seas,save_it=True)
+                    
+        
+        if metric_all_season:
+            median_log_summary=None
+            for seas in range(1,11):
+                sum_files=glob.glob('Summary_'+simu_name+'_'+thetype+'/Season_'+str(seas)+'/*.npy')
+                
+               
+                for fi in sum_files:
+                    fich=np.load(fi)
+                    if median_log_summary is None:
+                        median_log_summary=fich
+                    else:
+                        median_log_summary=np.concatenate((median_log_summary,fich))
+
+            print(median_log_summary.dtype)
+
+            for bn in bands:
+                f5_cadence_plot(instr_snsim, bn, # instr_name + '::' + bn,
+                                lims=lims_snsim,lims_sncosmo=lims_sncosmo, 
+                                mag_range=(21., 25.5),
+                                dt_range=(0.5, 30.),
+                                median_log_summary=median_log_summary,median_log_summaryb=None,
+                                target=target,alpha=0.1,simu_name=simu_name,thetype=thetype,seas=-1,save_it=True)
+                plt.show()
+
+
+
+    if Plots:
+
+        Plots_per_season=True
+        rb=[]
+        for seas in range(1,2):
+            sum_files=glob.glob('Summary_'+simu_name+'_'+thetype+'/Season_'+str(seas)+'/*.npy')
+
+            median_log_summary=None
+            for fi in sum_files:
+                fich=np.load(fi)
+                if median_log_summary is None:
+                    median_log_summary=fich
+                else:
+                    median_log_summary=np.concatenate((median_log_summary,fich))
+                    
+            print(median_log_summary.dtype)
+            bands='griz'
+            if Plots_per_season:
+                """
+                Plot(median_log_summary,bands,seas,'m5','skyBrightness',simu_name,thetype,saveplot=True)
+                Plot_Prof(median_log_summary,bands,seas,'m5','skyBrightness')
+                Plot(median_log_summary,bands,seas,'moonPhase','skyBrightness',simu_name,thetype,saveplot=True)
+                Plot(median_log_summary,bands,seas,'moonDistance','skyBrightness',simu_name,thetype,saveplot=True)
+                Plot_Prof(median_log_summary,bands,seas,'moonDistance','skyBrightness')
+                Plot_Stat(median_log_summary,bands,seas,'cadence',simu_name,thetype)
+                """
+                for band in bands:
+                    iu= median_log_summary['band']==band
+                    seld=median_log_summary[iu]
+                    #Plot_Moll(seld['RA_SN'],seld['Dec_SN'],seld['m5'],'',seas,thetype,band+' band','Median 5$\sigma$ depth[mag]',savename='Moll_median_m5_'+band)
+                    Plot_Moll(seld['RA_SN'],seld['Dec_SN'],seld['seas_length_band'],'',seas,thetype,band+' band','Season length[day]',savename='Season_length_'+band)
+                    Plot_Hist(seld['seas_length_band'],'',seas,thetype,band+' band','Season length[day]',savename='Season_length_'+band+'_hist')
+
+            for band in bands:
+                
+                idx = median_log_summary['band'] == band
+                sel=median_log_summary[idx]
+                med_m5=np.median(sel['m5'])
+                med_sky=np.median(sel['skyBrightness'])
+                med_airmass=np.median(sel['airmass'])
+                med_moon_phase=np.median(sel['moonPhase'])
+                rb.append((seas,band,med_m5,med_sky,med_airmass,med_moon_phase))
+
+        
+        print rb
+        res=np.rec.fromrecords(rb, names = ['season', 'band', 'med_m5', 'med_sky','med_airmass','med_moon_phase'])
+
+        filtercolors = {'u':'b', 'g':'c', 'r':'g', 'i':'y', 'z':'r', 'y':'m'}
+        
+        thevars=['m5','sky','airmass','moon_phase']
+        legy=dict(zip(thevars,['Median m5 [mag]','Median Skybrightness [mag]','Median airmass','Median Moon phase']))
+        for var in thevars:
+            figa, axa = plt.subplots(ncols=1, nrows=1)
+            figa.suptitle('WFD - '+simu_name)
+            tot_label=[]
+            for band in bands:
+                io = res['band']==band
+                selb=res[io]
+                tot_label.append(axa.errorbar(selb['season'],selb['med_'+var],color=filtercolors[band],label=band+' band'))
+            axa.set_xlabel('Season')
+            axa.set_ylabel(legy[var])
+            labs = [l.get_label() for l in tot_label]
+            axa.legend(tot_label, labs, ncol=4,loc='lower right',prop={'size':12},frameon=False)
+            dirout='Plots_'+simu_name+'_'+thetype
+            Check_Dir(dirout)
+            plt.gcf().savefig(dirout+'/Median_'+var+'.png', bbox_inches='tight')
+            
+        #plt.show()
+
+        """
+        Plot(median_log_summary,bands,'m5','airmass')
+        #Plot(median_log_summary,bands,'m5','Nvisits')
+        Plot(median_log_summary,bands,'moonDistance','skyBrightness')
+        Plot(median_log_summary,bands,'moonAlt','skyBrightness')
+        Plot(median_log_summary,bands,'moonAz','skyBrightness')
+        Plot(median_log_summary,bands,'moonPhase','skyBrightness')
+        Plot_Stat(median_log_summary,bands,'cadence',simu_name)
+        for band in bands:
+        Plot_Moll(median_log_summary['RA_SN'],median_log_summary['Dec_SN'],median_log_summary['skyBrightness'],'',season,band+' band','Median sky brightness[mag]','median_msky_'+band)
+        Plot_Moll(median_log_summary['RA_SN'],median_log_summary['Dec_SN'],median_log_summary['m5'],'',season,band+' band','Median 5$\sigma$ depth[mag]','median_m5_'+band)
+        Plot_Moll(median_log_summary['RA_SN'],median_log_summary['Dec_SN'],median_log_summary['moonDistance'],'',season,band+' band','Median moon Distance','median_moon_Diatance'+band)
+        Plot_Moll(median_log_summary['RA_SN'],median_log_summary['Dec_SN'],median_log_summary['cloud'],'',season,band+' band','Median cloud','cloud'+band)
+            """    
+        
+            
+#plt.show()
+
+
 

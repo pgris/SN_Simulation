@@ -7,6 +7,12 @@
 ##setup pipe_tasks
 #setup sconsUtils 10.0
 #C++11
+softdir=SNSim_Simulation
+
+thedir=/pbs/throng/lsst/users/gris
+export PYTHONPATH=${thedir}/${softdir}/lib/python2.7/site-packages:$PYTHONPATH
+export SALTPATH=${thedir}/${softdir}/snfit_data
+export LD_LIBRARY_PATH=${thedir}/${softdir}/lib:${LD_LIBRARY_PATH}
 
 export PATH=/opt/rh/devtoolset-3/root/usr/bin:${PATH}
 
@@ -39,3 +45,4 @@ setup -k -r ${dir_tag}/sims_maf
 export FAKE_THROUGH=snfit_data/Instruments/LSST.fake
 export OPSIM_LOGS=/pbs/throng/lsst/users/gris/Ana_Cadence/OpSimLogs
 export PYTHONPATH=/pbs/throng/lsst/users/gris/lib/python2.7/site-packages/:${PYTHONPATH}
+export PYTHONPATH=../../Basemap/lib/python2.7/site-packages:$PYTHONPATH
